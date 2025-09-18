@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="robots" content="noindex, nofollow">
+    <title>ホテラバ presents Quiz☆カラコンアカデミア - スタンドアロン版</title>
+    <style>
+        /* 基本リセット */
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(180deg, #fff2f7, #fffafc);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .shell {
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        /* ヘッダー */
+        .hero {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .logo {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #FF6EC7, #FF9472);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            flex-shrink: 0;
+        }
+
+        .hero-text h1 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .api {
+            color: #999;
+            font-size: 12px;
+        }
+
+        /* カード */
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        /* フォーム */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #E0E0E0;
+            border-radius: 12px;
+            font-size: 16px;
+            background: white;
+            transition: border-color 0.2s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #FF6EC7;
+            box-shadow: 0 0 0 3px rgba(255, 110, 199, 0.1);
+        }
+
+        .help-text {
+            color: #666;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        /* ボタン */
+        .btn {
+            padding: 16px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #FF6EC7, #FF9472);
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 110, 199, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 110, 199, 0.4);
+        }
+
+        .btn-secondary {
+            background: #E3F2FD;
+            color: #1565C0;
+            border: 2px solid #90CAF9;
+        }
+
+        .btn-secondary:hover {
+            background: #BBDEFB;
+        }
+
+        /* ステータス表示 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 16px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.2);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        /* クイズ関連 */
+        .quiz-header {
+            background: linear-gradient(135deg, #FF6EC7, #FF9472);
+            color: white;
+            padding: 20px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+        }
+
+        .quiz-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .timer {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .timer.warning {
+            background: #FF4444;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .progress-bar {
+            background: rgba(255,255,255,0.3);
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: white;
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+
+        /* レンズ表示 */
+        .lens-container {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .lens-label {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .lens-display {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .lens-image {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            object-fit: cover;
+            border: 4px solid #FFD2EC;
+        }
+
+        /* ヒント */
+        .hint-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .hint-btn {
+            flex: 1;
+            padding: 12px 16px;
+            background: #FFF0F8;
+            border: 2px solid #FFD2EC;
+            border-radius: 12px;
+            color: #FF6EC7;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .hint-btn:hover {
+            background: #FFE3F2;
+        }
+
+        .hint-btn.used {
+            background: #FFD2EC;
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .hint-display {
+            display: none;
+            background: #FFF9E6;
+            border: 2px solid #FFE59E;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            color: #8B6914;
+            font-size: 14px;
+            white-space: pre-line;
+            line-height: 1.6;
+        }
+
+        .hint-display.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 選択肢 */
+        .answer-options {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .answer-option {
+            background: white;
+            border: 2px solid #E0E0E0;
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .answer-option:hover {
+            border-color: #FF6EC7;
+            background: #FFF0F8;
+            transform: translateY(-1px);
+        }
+
+        .answer-option:focus {
+            outline: none;
+            border-color: #FF6EC7;
+            box-shadow: 0 0 0 3px rgba(255, 110, 199, 0.1);
+        }
+
+        .answer-option.selected {
+            border-color: #FF6EC7;
+            background: #FFE3F2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 110, 199, 0.2);
+        }
+
+        .answer-radio {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #E0E0E0;
+            border-radius: 50%;
+            position: relative;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .answer-option.selected .answer-radio {
+            border-color: #FF6EC7;
+            background: #FF6EC7;
+        }
+
+        .answer-option.selected .answer-radio::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        /* フィードバック */
+        .feedback-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .feedback-card {
+            background: white;
+            padding: 32px;
+            border-radius: 24px;
+            text-align: center;
+            max-width: 320px;
+            margin: 20px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+            animation: scaleIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .feedback-correct {
+            border: 4px solid #4CAF50;
+        }
+
+        .feedback-incorrect {
+            border: 4px solid #F44336;
+        }
+
+        .feedback-timeout {
+            border: 4px solid #FF9800;
+        }
+
+        .feedback-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .feedback-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+
+        .feedback-message {
+            color: #666;
+            margin-bottom: 16px;
+        }
+
+        /* ユーティリティ */
+        .hidden {
+            display: none !important;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        /* リスト表示 */
+        .ranking-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .ranking-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .ranking-item:last-child {
+            border-bottom: none;
+        }
+
+        .ranking-medal {
+            font-size: 18px;
+            width: 50px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .ranking-info {
+            flex: 1;
+            margin: 0 12px;
+        }
+
+        .ranking-name {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .ranking-detail {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .ranking-score {
+            font-weight: bold;
+            color: #FF6EC7;
+            font-size: 16px;
+        }
+
+        .user-highlight {
+            background: #FFF0F8;
+            border-radius: 8px;
+            padding: 8px;
+            margin: -8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <!-- ヘッダー -->
+        <div class="hero">
+            <div class="logo">👁️</div>
+            <div class="hero-text">
+                <h1>Quiz☆カラコンアカデミア</h1>
+                <div class="api">ホテラバ presents v2.0 - スタンドアロン版</div>
+            </div>
+        </div>
+
+        <!-- ログイン画面 -->
+        <div id="loginPage" class="page">
+            <div class="card">
+                <h2>スタッフログイン</h2>
+                <div class="input-group">
+                    <label for="staffId">スタッフ番号</label>
+                    <input
+                        type="text"
+                        id="staffId"
+                        name="staffId"
+                        placeholder="例：ST001"
+                        value="ST001"
+                        autocomplete="username"
+                        aria-describedby="staffId-help">
+                    <div id="staffId-help" class="help-text">例：ST001</div>
+                </div>
+                <div class="input-group">
+                    <label for="userName">お名前</label>
+                    <input
+                        type="text"
+                        id="userName"
+                        name="userName"
+                        placeholder="例：山田花子"
+                        value="テストユーザー"
+                        autocomplete="name"
+                        aria-describedby="userName-help">
+                    <div id="userName-help" class="help-text">フルネームで入力してください</div>
+                </div>
+                <button
+                    id="loginBtn"
+                    class="btn btn-primary"
+                    type="button"
+                    aria-label="スタッフ情報でログインする">
+                    ログイン
+                </button>
+            </div>
+        </div>
+
+        <!-- ホーム画面 -->
+        <div id="homePage" class="page hidden">
+            <div class="card" style="background: linear-gradient(135deg, #FF6EC7, #FF9472); color: white;">
+                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                    <div style="width: 56px; height: 56px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px;">👤</div>
+                    <div>
+                        <div style="font-size: 20px; font-weight: bold;" id="displayName">-</div>
+                        <div style="font-size: 14px;">Lv.5 スタッフ</div>
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="userPoints">850</div>
+                        <div class="stat-label">ポイント</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="userStreak">7日</div>
+                        <div class="stat-label">連続</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="todayBest">-</div>
+                        <div class="stat-label">本日</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="grid-2" style="margin-bottom: 16px;">
+                    <button
+                        id="startDailyBtn"
+                        class="btn btn-primary"
+                        type="button"
+                        aria-label="デイリーチャレンジを開始する">
+                        📅 デイリーチャレンジ
+                    </button>
+                    <button
+                        id="startPracticeBtn"
+                        class="btn btn-secondary"
+                        type="button"
+                        aria-label="練習モードを開始する">
+                        🎯 練習モード
+                    </button>
+                </div>
+                <div class="grid-2">
+                    <button
+                        id="rankingBtn"
+                        class="btn"
+                        type="button"
+                        style="background: #FFF3E0; color: #F57C00; border: 2px solid #FFB74D;"
+                        aria-label="ランキングを表示する">
+                        🏆 ランキング
+                    </button>
+                    <button
+                        id="myPageBtn"
+                        class="btn"
+                        type="button"
+                        style="background: #F3E5F5; color: #7B1FA2; border: 2px solid #CE93D8;"
+                        aria-label="マイ成績を表示する">
+                        📊 マイ成績
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- クイズ画面 -->
+        <div id="quizPage" class="page hidden">
+            <div class="quiz-header">
+                <div class="quiz-info">
+                    <div>Question <span id="currentQuestionNum">1</span>/10</div>
+                    <div class="timer" id="timer">
+                        <span>⏱</span>
+                        <span id="timeLeft">20</span>秒
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 10%;"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="lens-container">
+                    <div class="lens-label">このカラコンは何？</div>
+                    <div class="lens-display">
+                        <img class="lens-image" id="leftLens" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E" alt="左レンズ">
+                        <img class="lens-image" id="rightLens" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E" alt="右レンズ">
+                    </div>
+                </div>
+
+                <div class="hint-buttons">
+                    <button
+                        class="hint-btn"
+                        id="hint1Btn"
+                        type="button"
+                        aria-label="ヒント1を表示する">
+                        💡 ヒント1
+                    </button>
+                    <button
+                        class="hint-btn"
+                        id="hint2Btn"
+                        type="button"
+                        aria-label="ヒント2を表示する">
+                        💡 ヒント2
+                    </button>
+                </div>
+
+                <div class="hint-display" id="hintDisplay" aria-live="polite"></div>
+
+                <div class="answer-options" id="answerOptions" role="radiogroup" aria-label="カラコンの選択肢">
+                    <!-- 選択肢が動的に生成される -->
+                </div>
+
+                <button
+                    class="btn btn-primary"
+                    id="submitBtn"
+                    type="button"
+                    aria-label="選択した回答を送信する">
+                    回答する
+                </button>
+            </div>
+        </div>
+
+        <!-- 結果画面 -->
+        <div id="resultPage" class="page hidden">
+            <div class="card text-center">
+                <h2 style="color: #FF6EC7; margin-bottom: 20px;">クイズ完了！</h2>
+                <div style="font-size: 48px; margin: 20px 0;">🎉</div>
+                <p style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">
+                    スコア: <span id="finalScore">0</span>点
+                </p>
+                <p style="color: #666; margin-bottom: 20px;">
+                    10問中 <span id="correctCount">0</span>問正解
+                </p>
+                <div class="grid-2">
+                    <button
+                        class="btn btn-primary"
+                        type="button"
+                        onclick="showPage('homePage')"
+                        aria-label="ホーム画面に戻る">
+                        ホームへ戻る
+                    </button>
+                    <button
+                        class="btn btn-secondary"
+                        type="button"
+                        onclick="restartQuiz()"
+                        aria-label="もう一度同じモードでプレイする">
+                        もう一度
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ランキング画面 -->
+        <div id="rankingPage" class="page hidden">
+            <div class="card">
+                <h2>🏆 ランキング</h2>
+                <div id="rankingList" class="ranking-list"></div>
+                <button
+                    class="btn btn-primary"
+                    type="button"
+                    onclick="showPage('homePage')"
+                    aria-label="ホーム画面に戻る">
+                    ホームへ戻る
+                </button>
+            </div>
+        </div>
+
+        <!-- マイ成績画面 -->
+        <div id="myPage" class="page hidden">
+            <div class="card">
+                <h2>📊 マイ成績</h2>
+                <div id="myStats"></div>
+                <button
+                    class="btn btn-primary"
+                    type="button"
+                    onclick="showPage('homePage')"
+                    aria-label="ホーム画面に戻る">
+                    ホームへ戻る
+                </button>
+            </div>
+        </div>
+
+        <!-- フィードバック表示 -->
+        <div id="feedbackOverlay" class="feedback-overlay hidden">
+            <div class="feedback-card" id="feedbackCard">
+                <div class="feedback-icon" id="feedbackIcon">🎉</div>
+                <div id="feedbackTitle" class="feedback-title">正解！</div>
+                <div id="feedbackMessage" class="feedback-message">よくできました</div>
+                <div id="feedbackImage"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // エラー完全抑制システム
+        (function initializeErrorSuppression() {
+            'use strict';
+
+            // 既知のエラーパターン
+            const IGNORED_PATTERNS = [
+                'runtime.lastError',
+                'extension port',
+                'message port closed',
+                'back/forward cache',
+                'Unrecognized feature',
+                'sandbox',
+                'postMessage',
+                'deserialize threw error',
+                'Apollo DevTools',
+                'Content script',
+                'warden_bin',
+                'mae_html_user',
+                'script.google.com',
+                'googleusercontent.com',
+                'contentScript.bundle.js'
+            ];
+
+            // コンソールメソッドのオーバーライド
+            const originalMethods = {
+                log: console.log,
+                warn: console.warn,
+                error: console.error,
+                info: console.info
+            };
+
+            function shouldIgnore(message) {
+                try {
+                    let msgStr = '';
+                    if (typeof message === 'string') {
+                        msgStr = message;
+                    } else if (message && typeof message === 'object') {
+                        msgStr = message.message || message.toString();
+                    } else {
+                        msgStr = String(message || '');
+                    }
+                    return IGNORED_PATTERNS.some(pattern =>
+                        msgStr.toLowerCase().includes(pattern.toLowerCase())
+                    );
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            // 完全なコンソールフィルタリング
+            ['log', 'warn', 'error', 'info'].forEach(method => {
+                console[method] = function(...args) {
+                    if (args.some(arg => shouldIgnore(arg))) {
+                        return; // 完全に無視
+                    }
+                    originalMethods[method].apply(console, args);
+                };
+            });
+
+            // グローバルエラーハンドリング
+            window.addEventListener('error', function(e) {
+                if (shouldIgnore(e.message) || shouldIgnore(e.filename)) {
+                    e.preventDefault();
+                    return true;
+                }
+                originalMethods.error('App Error:', e.message);
+            });
+
+            window.addEventListener('unhandledrejection', function(e) {
+                try {
+                    if (shouldIgnore(e.reason)) {
+                        e.preventDefault();
+                        return true;
+                    }
+                    originalMethods.error('Unhandled Promise Rejection:', e.reason);
+                } catch (err) {
+                    // エラーハンドリング中のエラーは無視
+                    e.preventDefault();
+                }
+            });
+
+            // Chrome API のモック（拡張機能がインストールされるまでコメントアウト）
+            // 通常のWebページでは chrome.runtime は使用できません
+            /*
+            if (typeof chrome === 'undefined') {
+                window.chrome = {};
+            }
+            if (!chrome.runtime) {
+                chrome.runtime = {
+                    onMessage: { addListener: function() {} },
+                    sendMessage: function() {},
+                    lastError: null
+                };
+            }
+            */
+
+        })();
+
+        // アプリケーション本体
+        const App = (function() {
+            'use strict';
+
+            // 状態管理
+            let state = {
+                currentUser: null,
+                quizData: null,
+                currentQuestionIndex: 0,
+                selectedAnswer: null,
+                answers: [],
+                timer: null,
+                timeLeft: 20,
+                hintsUsed: { h1: false, h2: false },
+                quizId: null,
+                gameMode: 'practice'
+            };
+
+            // ページ表示切り替え
+            function showPage(pageId) {
+                document.querySelectorAll('.page').forEach(page => {
+                    page.classList.add('hidden');
+                });
+
+                const targetPage = document.getElementById(pageId);
+                if (targetPage) {
+                    targetPage.classList.remove('hidden');
+                }
+            }
+
+            // ログイン処理
+            function handleLogin() {
+                const staffId = document.getElementById('staffId').value.trim();
+                const userName = document.getElementById('userName').value.trim();
+
+                if (!staffId || !userName) {
+                    alert('スタッフ番号とお名前を入力してください');
+                    return;
+                }
+
+                state.currentUser = {
+                    staffId: staffId,
+                    name: userName,
+                    role: 'role_baito'
+                };
+
+                document.getElementById('displayName').textContent = userName;
+                showPage('homePage');
+                console.log('ログイン成功:', state.currentUser);
+            }
+
+            // ダミークイズデータ生成
+            function generateQuizData() {
+                const brands = ['ダスティティー', 'アイクローゼット', 'ハニーキス', 'ミークレール'];
+                const colors = ['狂愛ブラウン', 'ホロブラウン', 'ちゅるんブラウン', 'あざとブラウン'];
+                const questions = [];
+
+                for (let i = 0; i < 10; i++) {
+                    const correctBrand = brands[i % brands.length];
+                    const correctColor = colors[i % colors.length];
+                    const correctLabel = `${correctBrand}｜${correctColor}`;
+
+                    // 他の選択肢を生成
+                    const wrongOptions = [];
+                    while (wrongOptions.length < 3) {
+                        const wrongBrand = brands[Math.floor(Math.random() * brands.length)];
+                        const wrongColor = colors[Math.floor(Math.random() * colors.length)];
+                        const wrongLabel = `${wrongBrand}｜${wrongColor}`;
+
+                        if (wrongLabel !== correctLabel && !wrongOptions.includes(wrongLabel)) {
+                            wrongOptions.push(wrongLabel);
+                        }
+                    }
+
+                    // 選択肢をシャッフル
+                    const allOptions = [correctLabel, ...wrongOptions];
+                    const shuffledOptions = allOptions.sort(() => Math.random() - 0.5);
+
+                    questions.push({
+                        qid: `q${String(i+1).padStart(3, '0')}`,
+                        correctAnswer: shuffledOptions.indexOf(correctLabel),
+                        correctLabel: correctLabel,
+                        imageUrl: 'https://via.placeholder.com/150/FFB6C1/FFFFFF?text=Lens+${i+1}',
+                        thumbUrl: 'https://via.placeholder.com/80/90CAF9/FFFFFF?text=OK+${i+1}',
+                        options: shuffledOptions.map((label, idx) => ({
+                            oid: `o${String(idx+1).padStart(3, '0')}`,
+                            label: label,
+                            isCorrect: label === correctLabel
+                        })),
+                        hints: {
+                            h1: `DIA:14.${3+i%8} / G.DIA:13.${2+i%6} / BC:8.${4+i%4}`,
+                            h2: [
+                                'フチで瞳をくっきり見せつつ、中心部の透明感で「うるツヤ」効果を演出',
+                                'ナチュラルな発色で瞳に溶け込むようなデザイン',
+                                '大人っぽい印象を与える落ち着いたカラー',
+                                '可愛らしさを演出する甘めの発色'
+                            ][i % 4]
+                        }
+                    });
+                }
+
+                return questions;
+            }
+
+            // クイズ開始
+            function startQuiz(mode = 'practice') {
+                state.gameMode = mode;
+                state.quizData = generateQuizData();
+                state.quizId = 'quiz_' + Date.now();
+                state.currentQuestionIndex = 0;
+                state.answers = [];
+
+                showPage('quizPage');
+                loadQuestion();
+            }
+
+            // 問題読み込み
+            function loadQuestion() {
+                if (state.currentQuestionIndex >= state.quizData.length) {
+                    finishQuiz();
+                    return;
+                }
+
+                const question = state.quizData[state.currentQuestionIndex];
+
+                // UI更新
+                document.getElementById('currentQuestionNum').textContent = state.currentQuestionIndex + 1;
+                document.getElementById('progressFill').style.width =
+                    `${((state.currentQuestionIndex + 1) / 10) * 100}%`;
+
+                // 画像設定
+                const leftLens = document.getElementById('leftLens');
+                const rightLens = document.getElementById('rightLens');
+                if (leftLens && rightLens) {
+                    leftLens.src = question.imageUrl || '';
+                    rightLens.src = question.imageUrl || '';
+                    leftLens.onerror = function() {
+                        this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect width="150" height="150" fill="%23FFB6C1"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="16"%3ELens%3C/text%3E%3C/svg%3E';
+                    };
+                    rightLens.onerror = function() {
+                        this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect width="150" height="150" fill="%23FFB6C1"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="16"%3ELens%3C/text%3E%3C/svg%3E';
+                    };
+                }
+
+                // 選択肢表示
+                const optionsContainer = document.getElementById('answerOptions');
+                optionsContainer.innerHTML = '';
+
+                question.options.forEach((option, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'answer-option';
+                    div.dataset.index = index;
+                    div.setAttribute('role', 'radio');
+                    div.setAttribute('aria-checked', 'false');
+                    div.setAttribute('tabindex', '0');
+                    div.setAttribute('aria-label', `選択肢${index + 1}: ${option.label}`);
+
+                    div.innerHTML = `
+                        <div class="answer-radio" aria-hidden="true"></div>
+                        <div>${option.label}</div>
+                    `;
+
+                    div.addEventListener('click', () => selectOption(index));
+                    div.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            selectOption(index);
+                        }
+                    });
+
+                    optionsContainer.appendChild(div);
+                });
+
+                // ヒントリセット
+                state.hintsUsed = { h1: false, h2: false };
+                document.getElementById('hint1Btn').classList.remove('used');
+                document.getElementById('hint2Btn').classList.remove('used');
+                document.getElementById('hintDisplay').classList.remove('show');
+                document.getElementById('hintDisplay').textContent = '';
+
+                // 選択リセット
+                state.selectedAnswer = null;
+
+                // タイマー開始
+                startTimer();
+            }
+
+            // 選択肢選択
+            function selectOption(index) {
+                document.querySelectorAll('.answer-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                    opt.setAttribute('aria-checked', 'false');
+                });
+
+                const selected = document.querySelector(`[data-index="${index}"]`);
+                if (selected) {
+                    selected.classList.add('selected');
+                    selected.setAttribute('aria-checked', 'true');
+                    state.selectedAnswer = index;
+                }
+            }
+
+            // タイマー
+            function startTimer() {
+                state.timeLeft = 20;
+                clearInterval(state.timer);
+
+                state.timer = setInterval(() => {
+                    state.timeLeft--;
+                    document.getElementById('timeLeft').textContent = state.timeLeft;
+
+                    const timerEl = document.getElementById('timer');
+                    if (state.timeLeft <= 5) {
+                        timerEl.classList.add('warning');
+                    } else {
+                        timerEl.classList.remove('warning');
+                    }
+
+                    if (state.timeLeft <= 0) {
+                        clearInterval(state.timer);
+                        submitAnswer(true);
+                    }
+                }, 1000);
+            }
+
+            // 回答送信
+            function submitAnswer(isTimeout = false) {
+                clearInterval(state.timer);
+
+                const question = state.quizData[state.currentQuestionIndex];
+                const isCorrect = state.selectedAnswer !== null &&
+                    state.selectedAnswer === question.correctAnswer;
+
+                state.answers.push({
+                    qid: question.qid,
+                    selectedIndex: state.selectedAnswer,
+                    isCorrect: isCorrect,
+                    tMs: (20 - state.timeLeft) * 1000,
+                    h1: state.hintsUsed.h1,
+                    h2: state.hintsUsed.h2,
+                    isTimeout: isTimeout
+                });
+
+                // フィードバック表示
+                showFeedback(isCorrect, question, isTimeout);
+
+                state.currentQuestionIndex++;
+
+                // 2秒後に次の問題へ
+                setTimeout(() => {
+                    hideFeedback();
+                    loadQuestion();
+                }, 2000);
+            }
+
+            // フィードバック表示
+            function showFeedback(isCorrect, question, isTimeout = false) {
+                const overlay = document.getElementById('feedbackOverlay');
+                const card = document.getElementById('feedbackCard');
+                const icon = document.getElementById('feedbackIcon');
+                const title = document.getElementById('feedbackTitle');
+                const message = document.getElementById('feedbackMessage');
+                const imageDiv = document.getElementById('feedbackImage');
+
+                card.className = 'feedback-card';
+
+                if (isCorrect) {
+                    card.classList.add('feedback-correct');
+                    icon.textContent = '🎉';
+                    title.textContent = '正解！';
+                    message.textContent = question.correctLabel;
+
+                    imageDiv.innerHTML = `
+                        <img src="${question.thumbUrl}"
+                             style="width: 60px; height: 60px; border-radius: 50%;
+                                    object-fit: cover; margin-top: 8px;"
+                             alt="正解画像">
+                    `;
+                } else {
+                    if (isTimeout) {
+                        card.classList.add('feedback-timeout');
+                        icon.textContent = '⏰';
+                        title.textContent = 'タイムアウト';
+                    } else {
+                        card.classList.add('feedback-incorrect');
+                        icon.textContent = '❌';
+                        title.textContent = '不正解';
+                    }
+                    message.textContent = `正解: ${question.correctLabel}`;
+                    imageDiv.innerHTML = '';
+                }
+
+                overlay.classList.remove('hidden');
+            }
+
+            function hideFeedback() {
+                document.getElementById('feedbackOverlay').classList.add('hidden');
+            }
+
+            // クイズ終了
+            function finishQuiz() {
+                const correctCount = state.answers.filter(a => a.isCorrect).length;
+                const wrongCount = state.answers.filter(a => !a.isCorrect).length;
+                const hintCount = state.answers.reduce((sum, a) =>
+                    sum + (a.h1 ? 1 : 0) + (a.h2 ? 1 : 0), 0);
+
+                // スコア計算
+                const baseScore = 100;
+                const wrongPenalty = wrongCount * 10;
+                const hintPenalty = hintCount * 3;
+                const finalScore = Math.max(0, Math.min(100, baseScore - wrongPenalty - hintPenalty));
+
+                document.getElementById('finalScore').textContent = finalScore;
+                document.getElementById('correctCount').textContent = correctCount;
+
+                // 統計更新
+                updateUserStats(finalScore);
+
+                showPage('resultPage');
+            }
+
+            // ユーザー統計更新
+            function updateUserStats(score) {
+                const currentPoints = parseInt(document.getElementById('userPoints').textContent) || 0;
+                const newPoints = currentPoints + Math.floor(score / 10);
+                document.getElementById('userPoints').textContent = newPoints;
+
+                const todayBest = parseInt(document.getElementById('todayBest').textContent) || 0;
+                if (score > todayBest || todayBest === 0) {
+                    document.getElementById('todayBest').textContent = score;
+                }
+            }
+
+            // ヒント表示
+            function showHint(hintType) {
+                const question = state.quizData[state.currentQuestionIndex];
+                if (!question) return;
+
+                const display = document.getElementById('hintDisplay');
+
+                if (hintType === 'h1' && !state.hintsUsed.h1) {
+                    state.hintsUsed.h1 = true;
+                    document.getElementById('hint1Btn').classList.add('used');
+                    display.textContent = question.hints.h1;
+                    display.classList.add('show');
+                } else if (hintType === 'h2' && !state.hintsUsed.h2) {
+                    state.hintsUsed.h2 = true;
+                    document.getElementById('hint2Btn').classList.add('used');
+
+                    const current = display.textContent;
+                    display.textContent = current ?
+                        `${current}\n\n${question.hints.h2}` : question.hints.h2;
+                    display.classList.add('show');
+                }
+            }
+
+            // ランキング表示
+            function showRanking() {
+                showPage('rankingPage');
+
+                const rankings = [
+                    { name: '山田花子', score: 95, playCount: 15 },
+                    { name: '佐藤美咲', score: 92, playCount: 12 },
+                    { name: '田中あい', score: 88, playCount: 18 },
+                    { name: '鈴木ゆり', score: 85, playCount: 9 },
+                    { name: '高橋みお', score: 82, playCount: 22 },
+                    { name: state.currentUser?.name || 'あなた', score: 78, playCount: 5 }
+                ];
+
+                let html = `
+                    <div style="background: #FFF3E0; padding: 16px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+                        <strong>🏆 TOP 10 ランキング</strong>
+                    </div>
+                `;
+
+                rankings.forEach((player, index) => {
+                    const rank = index + 1;
+                    const medal = rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : `${rank}位`;
+                    const isUser = state.currentUser && player.name === state.currentUser.name;
+
+                    html += `
+                        <div class="ranking-item ${isUser ? 'user-highlight' : ''}">
+                            <div class="ranking-medal">${medal}</div>
+                            <div class="ranking-info">
+                                <div class="ranking-name">
+                                    ${player.name}${isUser ? ' (あなた)' : ''}
+                                </div>
+                                <div class="ranking-detail">${player.playCount}回プレイ</div>
+                            </div>
+                            <div class="ranking-score">${player.score}点</div>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('rankingList').innerHTML = html;
+            }
+
+            // マイ成績表示
+            function showMyPage() {
+                showPage('myPage');
+
+                const stats = {
+                    averageScore: 78,
+                    totalPlays: 12,
+                    todayBest: document.getElementById('todayBest').textContent,
+                    recentScores: [85, 72, 91, 65, 88]
+                };
+
+                let html = `
+                    <div class="stats-grid" style="margin-bottom: 24px;">
+                        <div class="stat-card" style="background: #E3F2FD;">
+                            <div class="stat-value" style="color: #1565C0;">${stats.averageScore}</div>
+                            <div class="stat-label">平均スコア</div>
+                        </div>
+                        <div class="stat-card" style="background: #F3E5F5;">
+                            <div class="stat-value" style="color: #7B1FA2;">${stats.totalPlays}</div>
+                            <div class="stat-label">プレイ回数</div>
+                        </div>
+                        <div class="stat-card" style="background: #FFF3E0;">
+                            <div class="stat-value" style="color: #F57C00;">${stats.todayBest}</div>
+                            <div class="stat-label">今日のベスト</div>
+                        </div>
+                    </div>
+                    <h3 style="margin-bottom: 16px;">📈 最近の成績</h3>
+                `;
+
+                stats.recentScores.forEach((score, index) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - (stats.recentScores.length - 1 - index));
+
+                    html += `
+                        <div style="display: flex; justify-content: space-between; align-items: center;
+                                    padding: 12px 0; border-bottom: 1px solid #eee;">
+                            <span>${date.toLocaleDateString('ja-JP')}</span>
+                            <span style="font-weight: bold; color: #FF6EC7;">${score}点</span>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('myStats').innerHTML = html;
+            }
+
+            function restartQuiz() {
+                startQuiz(state.gameMode);
+            }
+
+            // イベントリスナー設定
+            function setupEventListeners() {
+                // ログイン（OAuth対応）
+                const loginBtn = document.getElementById('loginBtn');
+                if (loginBtn) {
+                    // OAuth URLを設定（実際のURLに置き換えてください）
+                    const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_REDIRECT_URI&response_type=code&scope=email%20profile';
+
+                    loginBtn.addEventListener('click', () => {
+                        // 戻ってきた時のためのフラグを設定
+                        sessionStorage.setItem('login_flow', 'started');
+
+                        // 即座にリダイレクト（awaitやfetchなどの非同期処理は入れない）
+                        window.top.location.href = AUTH_URL;
+                    });
+                }
+
+                const userNameInput = document.getElementById('userName');
+                if (userNameInput) {
+                    userNameInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') handleLogin();
+                    });
+                }
+
+                // メニュー
+                const startDailyBtn = document.getElementById('startDailyBtn');
+                if (startDailyBtn) {
+                    startDailyBtn.addEventListener('click', () => startQuiz('daily'));
+                }
+
+                const startPracticeBtn = document.getElementById('startPracticeBtn');
+                if (startPracticeBtn) {
+                    startPracticeBtn.addEventListener('click', () => startQuiz('practice'));
+                }
+
+                const rankingBtn = document.getElementById('rankingBtn');
+                if (rankingBtn) {
+                    rankingBtn.addEventListener('click', showRanking);
+                }
+
+                const myPageBtn = document.getElementById('myPageBtn');
+                if (myPageBtn) {
+                    myPageBtn.addEventListener('click', showMyPage);
+                }
+
+                // クイズ
+                const hint1Btn = document.getElementById('hint1Btn');
+                if (hint1Btn) {
+                    hint1Btn.addEventListener('click', () => showHint('h1'));
+                }
+
+                const hint2Btn = document.getElementById('hint2Btn');
+                if (hint2Btn) {
+                    hint2Btn.addEventListener('click', () => showHint('h2'));
+                }
+
+                const submitBtn = document.getElementById('submitBtn');
+                if (submitBtn) {
+                    submitBtn.addEventListener('click', () => submitAnswer());
+                }
+            }
+
+            // 公開API
+            return {
+                showPage,
+                restartQuiz,
+                init: function() {
+                    setupEventListeners();
+                    console.log('クイズアプリ起動完了 - スタンドアロン版');
+                }
+            };
+
+        })();
+
+        // アプリケーション初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            App.init();
+        });
+
+        // グローバル関数
+        function showPage(pageId) {
+            App.showPage(pageId);
+        }
+
+        function restartQuiz() {
+            App.restartQuiz();
+        }
+
+    </script>
+</body>
+</html>

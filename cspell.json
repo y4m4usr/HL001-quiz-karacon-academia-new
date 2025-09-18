@@ -1,0 +1,18 @@
+{
+  "version": "0.2",
+  "language": "en,ja",
+  "words": [
+    "imgw",
+    "STACKDRIVER",
+    "baito",
+    "SESS",
+    "dstr",
+    "Prac",
+    "healthcheck",
+    "NFKC",
+    "ALLOWALL",
+    "distractors"
+  ],
+  "ignoreWords": [],
+  "import": []
+}
