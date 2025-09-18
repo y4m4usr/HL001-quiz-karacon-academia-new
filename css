@@ -1,0 +1,4 @@
+// HealthTools.gs
+function include(name) {
+  return HtmlService.createHtmlOutputFromFile(name).getContent();
+}
