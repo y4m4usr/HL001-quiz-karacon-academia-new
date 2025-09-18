@@ -1,0 +1,9 @@
+﻿node_modules/
+dist/
+.DS_Store
+.env
+.vscode/
+.idea/
+.clasp.json
+credentials.json
+service-account-*.json
