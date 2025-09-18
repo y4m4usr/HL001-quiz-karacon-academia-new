@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>カラコンマスター - 完全動作デモ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Meiryo', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .app-container {
+            width: 100%;
+            max-width: 420px;
+            background: #000;
+            border-radius: 40px;
+            padding: 15px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+        }
+        
+        .screen {
+            background: white;
+            border-radius: 30px;
+            overflow: hidden;
+            min-height: 700px;
+            position: relative;
+        }
+        
+        .status-bar {
+            background: linear-gradient(135deg, #FF6EC7 0%, #FF9472 100%);
+            padding: 12px 20px;
+            color: white;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .page {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* ログイン画面 */
+        .login-page {
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .app-logo {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #FF6EC7 0%, #FF9472 100%);
+            border-radius: 30px;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            box-shadow: 0 10px 30px rgba(255,110,199,0.3);
+        }
+        
+        .app-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .app-subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 40px;
+        }
+        
+        .login-form {
+            margin-bottom: 30px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        
+        .input-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .input-field {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #E0E0E0;
+            border-radius: 15px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: #FF6EC7;
+            box-shadow: 0 0 0 3px rgba(255,110,199,0.1);
+        }
+        
+        .store-select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #E0E0E0;
+            border-radius: 15px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .login-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #FF6EC7 0%, #FF9472 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255,110,199,0.4);
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* ホーム画面 */
+        .home-page {
+            padding-bottom: 80px;
+        }
+        
+        .user-header {
+            background: linear-gradient(135deg, #FF6EC7 0%, #FF9472 100%);
+            padding: 25px;
+            color: white;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .user-avatar {
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-right: 15px;
+        }
+        
+        .user-details {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .user-store {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .user-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 15px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .menu-grid {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .menu-item {
+            background: white;
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            border: 2px solid transparent;
+        }
+        
+        .menu-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        
+        .menu-item.primary {
+            background: linear-gradient(135deg, #F093FB 0%, #F5576C 100%);
+            color: white;
+        }
+        
+        .menu-item.secondary {
+            background: linear-gradient(135deg, #4FACFE 0%, #00F2FE 100%);
+            color: white;
+        }
+        
+        .menu-item.tertiary {
+            background: linear-gradient(135deg, #FA709A 0%, #FEE140 100%);
+            color: white;
+        }
+        
+        .menu-item.quaternary {
+            background: linear-gradient(135deg, #30CFD0 0%, #330867 100%);
+            color: white;
+        }
+        
+        .menu-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+        
+        .menu-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .menu-desc {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .today-progress {
+            margin: 0 20px 20px;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .progress-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .progress-bar {
+            background: #E0E0E0;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, #FF6EC7 0%, #FF9472 100%);
+            height: 100%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        /* クイズ画面 */
+        .quiz-page {
+            padding: 20px;
+            padding-bottom: 100px;
+        }
+        
+        .quiz-header {
+            background: white;
+            border-radius: 20px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+        
+        .quiz-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .question-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .timer {
+            background: #FFE3F2;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: #FF6EC7;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .timer.warning {
+            background: #FFE3E3;
+            color: #FF4444;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .quiz-progress {
+            background: #E0E0E0;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .quiz-progress-fill {
+            background: linear-gradient(90deg, #FF6EC7 0%, #FF9472 100%);
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+        
+        .lens-container {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+        
+        .lens-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        .lens-display {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .lens-image {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            position: relative;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        
+        .lens-pattern-1 {
+            background: radial-gradient(circle at center,
+                rgba(139, 115, 85, 0.8) 0%,
+                rgba(212, 165, 116, 0.6) 25%,
+                rgba(139, 115, 85, 0.4) 45%,
+                rgba(212, 165, 116, 0.2) 65%,
+                transparent 75%);
+            border: 3px solid #E5D4C1;
+        }
+        
+        .lens-pattern-2 {
+            background: radial-gradient(circle at center,
+                rgba(168, 135, 112, 0.9) 0%,
+                rgba(188, 155, 132, 0.3) 40%,
+                transparent 60%);
+            border: 3px solid #C8B5A6;
+        }
+        
+        .lens-pattern-3 {
+            background: radial-gradient(circle at center,
+                rgba(156, 106, 173, 0.7) 0%,
+                rgba(156, 106, 173, 0.4) 30%,
+                rgba(255, 182, 193, 0.3) 50%,
+                transparent 70%);
+            border: 3px solid #DCC8E5;
+        }
+        
+        .lens-pattern-4 {
+            background: radial-gradient(circle at center,
+                rgba(100, 100, 100, 0.9) 0%,
+                transparent 15%,
+                rgba(150, 120, 90, 0.4) 30%,
+                transparent 60%);
+            border: 3px solid #B0B0B0;
+        }
+        
+        .lens-image::after {
+            content: '';
+            position: absolute;
+            top: 25%;
+            left: 25%;
+            width: 30%;
+            height: 30%;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            filter: blur(10px);
+        }
+        
+        .hint-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .hint-btn {
+            flex: 1;
+            padding: 12px;
+            background: #FFF0F8;
+            border: 2px solid #FFD2EC;
+            border-radius: 15px;
+            font-weight: bold;
+            color: #FF6EC7;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .hint-btn.used {
+            background: #FFD2EC;
+            border-color: #FF6EC7;
+        }
+        
+        .hint-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .hint-display {
+            display: none;
+            background: #FFF9E6;
+            border: 2px solid #FFE59E;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #8B6914;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .hint-display.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; max-height: 0; }
+            to { opacity: 1; max-height: 200px; }
+        }
+        
+        .answer-options {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .answer-option {
+            background: white;
+            border: 2px solid #E0E0E0;
+            border-radius: 15px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .answer-option:hover {
+            border-color: #FF6EC7;
+            background: #FFF0F8;
+        }
+        
+        .answer-option.selected {
+            border-color: #FF6EC7;
+            background: #FFE3F2;
+        }
+        
+        .answer-option.correct {
+            border-color: #4CAF50;
+            background: #E8F5E9;
+        }
+        
+        .answer-option.incorrect {
+            border-color: #F44336;
+            background: #FFEBEE;
+        }
+        
+        .answer-radio {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #E0E0E0;
+            border-radius: 50%;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .answer-option.selected .answer-radio {
+            border-color: #FF6EC7;
+        }
+        
+        .answer-option.selected .answer-radio::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background: #FF6EC7;
+            border-radius: 50%;
+        }
+        
+        .answer-text {
+            flex: 1;
+            font-size: 15px;
+            color: #333;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #FF6EC7 0%, #FF9472 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255,110,199,0.4);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .submit-btn:not(:disabled):hover {
+            transform: translateY(-2px);
+        }
+        
+        /* 結果画面 */
+        .result-page {
+            padding: 30px 20px;
+        }
+        
+        .result-card {
+            background: white;
+            border-radius: 25px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .result-emoji {
+            font-size: 72px;
+            margin-bottom: 20px;
+            animation: bounce 0.6s ease;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        
+        .result-title {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #FF6EC7 0%, #FF9472 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .result-score {
+            font-size: 48px;
+            font-weight: bold;
+            color: #333;
+            margin: 20px 0;
+        }
+        
+        .result-message {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        
+        .result-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .result-stat {
+            background: #F8F9FA;
+            padding: 15px;
+            border-radius: 15px;
+        }
+        
+        .result-stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .result-stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .result-details {
+            background: #F8F9FA;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .result-details-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .mistake-list {
+            text-align: left;
+        }
+        
+        .mistake-item {
+            background: white;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .mistake-item strong {
+            color: #333;
+        }
+        
+        .action-buttons {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .action-btn {
+            padding: 18px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        
+        .action-btn.primary {
+            background: linear-gradient(135deg, #FF6EC7 0%, #FF9472 100%);
+            color: white;
+            box-shadow: 0 5px 15px rgba(255,110,199,0.4);
+        }
+        
+        .action-btn.secondary {
+            background: white;
+            color: #FF6EC7;
+            border: 2px solid #FF6EC7;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* ランキング画面 */
+        .ranking-page {
+            padding: 20px;
+            padding-bottom: 100px;
+        }
+        
+        .ranking-header {
+            background: linear-gradient(135deg, #FF6EC7 0%, #FF9472 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .ranking-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .ranking-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .ranking-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .ranking-tab {
+            flex: 1;
+            padding: 12px;
+            background: white;
+            border: 2px solid #E0E0E0;
+            border-radius: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .ranking-tab.active {
+            background: linear-gradient(135deg, #FF6EC7 0%, #FF9472 100%);
+            color: white;
+            border-color: transparent;
+        }
+        
+        .ranking-list {
+            background: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .ranking-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #F0F0F0;
+            transition: background 0.3s ease;
+        }
+        
+        .ranking-item:last-child {
+            border-bottom: none;
+        }
+        
+        .ranking-item.current-user {
+            background: #FFF0F8;
+        }
+        
+        .ranking-position {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        
+        .ranking-item:nth-child(1) .ranking-position {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: white;
+            border-radius: 50%;
+            font-size: 20px;
+        }
+        
+        .ranking-item:nth-child(2) .ranking-position {
+            background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%);
+            color: white;
+            border-radius: 50%;
+            font-size: 18px;
+        }
+        
+        .ranking-item:nth-child(3) .ranking-position {
+            background: linear-gradient(135deg, #CD7F32 0%, #8B4513 100%);
+            color: white;
+            border-radius: 50%;
+            font-size: 18px;
+        }
+        
+        .ranking-user {
+            flex: 1;
+        }
+        
+        .ranking-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .ranking-store {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .ranking-score {
+            text-align: right;
+        }
+        
+        .ranking-points {
+            font-size: 20px;
+            font-weight: bold;
+            color: #FF6EC7;
+        }
+        
+        .ranking-rate {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        /* ボトムナビゲーション */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #E0E0E0;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #999;
+        }
+        
+        .nav-item.active {
+            color: #FF6EC7;
+        }
+        
+        .nav-icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+        
+        .nav-label {
+            font-size: 11px;
+        }
+        
+        /* フィードバックモーダル */
+        .feedback-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .feedback-modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .feedback-content {
+            background: white;
+            border-radius: 25px;
+            padding: 30px;
+            max-width: 350px;
+            width: 100%;
+            text-align: center;
+            animation: scaleIn 0.3s ease;
+        }
+        
+        @keyframes scaleIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        
+        .feedback-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        .feedback-icon.correct {
+            animation: rotate 0.5s ease;
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .feedback-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .feedback-correct .feedback-title {
+            color: #4CAF50;
+        }
+        
+        .feedback-incorrect .feedback-title {
+            color: #F44336;
+        }
+        
+        .feedback-answer {
+            background: #F8F9FA;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .feedback-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .feedback-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .feedback-specs {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .feedback-tip {
+            background: #FFF9E6;
+            border: 1px solid #FFE59E;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 13px;
+            color: #8B6914;
+            line-height: 1.5;
+        }
+        
+        .feedback-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #FF6EC7 0%, #FF9472 100%);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        
+        /* レスポンシブ対応 */
+        @media (max-width: 480px) {
+            .app-container {
+                border-radius: 0;
+                padding: 0;
+            }
+            
+            .screen {
+                border-radius: 0;
+                min-height: 100vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="screen">
+            <div class="status-bar">
+                <span id="currentTime">9:41</span>
+                <span>カラコンマスター</span>
+                <span>100%</span>
+            </div>
+            
+            <!-- ログイン画面 -->
+            <div class="page login-page active" id="loginPage">
+                <div class="app-logo">👁️</div>
+                <h1 class="app-title">カラコンマスター</h1>
+                <p class="app-subtitle">楽しく学ぶスタッフ教育アプリ</p>
+                
+                <div class="login-form">
+                    <div class="input-group">
+                        <label class="input-label">お名前</label>
+                        <input type="text" class="input-field" id="userName" placeholder="例：さくら" value="さくら">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">店舗</label>
+                        <select class="store-select" id="userStore">
+                            <option>渋谷店</option>
+                            <option>新宿店</option>
+                            <option>池袋店</option>
+                            <option>原宿店</option>
+                        </select>
+                    </div>
+                    <button class="login-btn" onclick="login()">ログイン</button>
+                </div>
+            </div>
+            
+            <!-- ホーム画面 -->
+            <div class="page home-page" id="homePage">
+                <div class="user-header">
+                    <div class="user-info">
+                        <div class="user-avatar">👤</div>
+                        <div class="user-details">
+                            <div class="user-name" id="displayName">さくらちゃん</div>
+                            <div class="user-store" id="displayStore">渋谷店</div>
+                        </div>
+                    </div>
+                    <div class="user-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">Lv.<span id="userLevel">5</span></div>
+                            <div class="stat-label">レベル</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value"><span id="userPoints">850</span></div>
+                            <div class="stat-label">ポイント</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value"><span id="userStreak">7</span>日</div>
+                            <div class="stat-label">連続</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="menu-grid">
+                    <div class="menu-item primary" onclick="startDailyQuiz()">
+                        <div class="menu-icon">🎯</div>
+                        <div class="menu-title">デイリーチャレンジ</div>
+                        <div class="menu-desc">1日10問に挑戦</div>
+                    </div>
+                    <div class="menu-item secondary" onclick="startPractice()">
+                        <div class="menu-icon">📚</div>
+                        <div class="menu-title">練習モード</div>
+                        <div class="menu-desc">無制限で練習</div>
+                    </div>
+                    <div class="menu-item tertiary" onclick="showRanking()">
+                        <div class="menu-icon">🏆</div>
+                        <div class="menu-title">ランキング</div>
+                        <div class="menu-desc">みんなの成績</div>
+                    </div>
+                    <div class="menu-item quaternary" onclick="showStats()">
+                        <div class="menu-icon">📊</div>
+                        <div class="menu-title">マイ成績</div>
+                        <div class="menu-desc">学習進捗</div>
+                    </div>
+                </div>
+                
+                <div class="today-progress">
+                    <div class="progress-title">
+                        <span>📈</span>
+                        <span>本日の進捗</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="todayProgress" style="width: 0%;">0%</div>
+                    </div>
+                    <div style="text-align: center; color: #666; font-size: 14px; margin-top: 10px;">
+                        <span id="todayStatus">まだ挑戦していません</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- クイズ画面 -->
+            <div class="page quiz-page" id="quizPage">
+                <div class="quiz-header">
+                    <div class="quiz-info">
+                        <div class="question-number">Question <span id="currentQuestion">1</span>/10</div>
+                        <div class="timer" id="timer">
+                            <span>⏱</span>
+                            <span id="timeLeft">20</span>秒
+                        </div>
+                    </div>
+                    <div class="quiz-progress">
+                        <div class="quiz-progress-fill" id="quizProgress" style="width: 10%;"></div>
+                    </div>
+                </div>
+                
+                <div class="lens-container">
+                    <div class="lens-label">このカラコンは何？</div>
+                    <div class="lens-display">
+                        <div class="lens-image" id="leftLens"></div>
+                        <div class="lens-image" id="rightLens"></div>
+                    </div>
+                </div>
+                
+                <div class="hint-buttons">
+                    <button class="hint-btn" id="hint1Btn" onclick="showHint(1)">
+                        <span>💡</span>
+                        <span>ヒント1</span>
+                    </button>
+                    <button class="hint-btn" id="hint2Btn" onclick="showHint(2)">
+                        <span>💡</span>
+                        <span>ヒント2</span>
+                    </button>
+                </div>
+                
+                <div class="hint-display" id="hintDisplay"></div>
+                
+                <div class="answer-options" id="answerOptions">
+                    <!-- 動的に生成 -->
+                </div>
+                
+                <button class="submit-btn" id="submitBtn" onclick="submitAnswer()">回答する</button>
+            </div>
+            
+            <!-- 結果画面 -->
+            <div class="page result-page" id="resultPage">
+                <div class="result-card">
+                    <div class="result-emoji" id="resultEmoji">🎉</div>
+                    <h2 class="result-title" id="resultTitle">素晴らしい！</h2>
+                    <div class="result-score" id="resultScore">85点</div>
+                    <p class="result-message" id="resultMessage">
+                        10問中8問正解！<br>
+                        とても良い成績です。この調子で頑張りましょう！
+                    </p>
+                    
+                    <div class="result-stats">
+                        <div class="result-stat">
+                            <div class="result-stat-label">正答率</div>
+                            <div class="result-stat-value" id="accuracyRate">80%</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">平均時間</div>
+                            <div class="result-stat-value" id="avgTime">8.5秒</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">ヒント使用</div>
+                            <div class="result-stat-value" id="hintsUsed">3回</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-label">獲得ポイント</div>
+                            <div class="result-stat-value" id="earnedPoints">+85pt</div>
+                        </div>
+                    </div>
+                    
+                    <div class="result-details" id="mistakeDetails" style="display: none;">
+                        <div class="result-details-title">間違えた問題</div>
+                        <div class="mistake-list" id="mistakeList">
+                            <!-- 動的に生成 -->
+                        </div>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <button class="action-btn primary" onclick="backToHome()">ホームに戻る</button>
+                        <button class="action-btn secondary" onclick="reviewMistakes()">間違えた問題を復習</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ランキング画面 -->
+            <div class="page ranking-page" id="rankingPage">
+                <div class="ranking-header">
+                    <h2 class="ranking-title">🏆 ランキング</h2>
+                    <p class="ranking-subtitle">みんなの成績を確認しよう</p>
+                </div>
+                
+                <div class="ranking-tabs">
+                    <div class="ranking-tab active" onclick="switchRankingTab('daily', this)">デイリー</div>
+                    <div class="ranking-tab" onclick="switchRankingTab('weekly', this)">ウィークリー</div>
+                    <div class="ranking-tab" onclick="switchRankingTab('monthly', this)">マンスリー</div>
+                </div>
+                
+                <div class="ranking-list" id="rankingList">
+                    <div class="ranking-item">
+                        <div class="ranking-position">1</div>
+                        <div class="ranking-user">
+                            <div class="ranking-name">みゆちゃん</div>
+                            <div class="ranking-store">新宿店</div>
+                        </div>
+                        <div class="ranking-score">
+                            <div class="ranking-points">980pt</div>
+                            <div class="ranking-rate">正答率 98%</div>
+                        </div>
+                    </div>
+                    <div class="ranking-item">
+                        <div class="ranking-position">2</div>
+                        <div class="ranking-user">
+                            <div class="ranking-name">あいちゃん</div>
+                            <div class="ranking-store">渋谷店</div>
+                        </div>
+                        <div class="ranking-score">
+                            <div class="ranking-points">920pt</div>
+                            <div class="ranking-rate">正答率 92%</div>
+                        </div>
+                    </div>
+                    <div class="ranking-item">
+                        <div class="ranking-position">3</div>
+                        <div class="ranking-user">
+                            <div class="ranking-name">ゆきちゃん</div>
+                            <div class="ranking-store">池袋店</div>
+                        </div>
+                        <div class="ranking-score">
+                            <div class="ranking-points">890pt</div>
+                            <div class="ranking-rate">正答率 89%</div>
+                        </div>
+                    </div>
+                    <div class="ranking-item current-user">
+                        <div class="ranking-position">5</div>
+                        <div class="ranking-user">
+                            <div class="ranking-name">さくらちゃん（あなた）</div>
+                            <div class="ranking-store">渋谷店</div>
+                        </div>
+                        <div class="ranking-score">
+                            <div class="ranking-points">850pt</div>
+                            <div class="ranking-rate">正答率 85%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- フィードバックモーダル -->
+            <div class="feedback-modal" id="feedbackModal">
+                <div class="feedback-content">
+                    <div class="feedback-icon" id="feedbackIcon">✅</div>
+                    <h3 class="feedback-title" id="feedbackTitle">正解！</h3>
+                    
+                    <div class="feedback-answer">
+                        <div class="feedback-label">正解</div>
+                        <div class="feedback-value" id="feedbackAnswer">ダスティティー 玉虫ブラウン</div>
+                        <div class="feedback-specs" id="feedbackSpecs">DIA 14.5 / G.DIA 13.6 / BC 8.6</div>
+                    </div>
+                    
+                    <div class="feedback-tip" id="feedbackTip">
+                        💡 識別ポイント：フチで瞳をくっきり見せつつ、中心部の透明感で「うるツヤ」効果を演出。ナチュラルに盛れる万能カラコン！
+                    </div>
+                    
+                    <button class="feedback-btn" onclick="nextQuestion()">次の問題へ</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ボトムナビゲーション -->
+        <div class="bottom-nav" id="bottomNav" style="display: none;">
+            <div class="nav-item active" onclick="navigateTo('home')">
+                <div class="nav-icon">🏠</div>
+                <div class="nav-label">ホーム</div>
+            </div>
+            <div class="nav-item" onclick="navigateTo('quiz')">
+                <div class="nav-icon">🎯</div>
+                <div class="nav-label">クイズ</div>
+            </div>
+            <div class="nav-item" onclick="navigateTo('ranking')">
+                <div class="nav-icon">🏆</div>
+                <div class="nav-label">ランキング</div>
+            </div>
+            <div class="nav-item" onclick="navigateTo('profile')">
+                <div class="nav-icon">👤</div>
+                <div class="nav-label">マイページ</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // グローバル変数
+        let currentUser = {
+            name: '',
+            store: '',
+            level: 5,
+            points: 850,
+            streak: 7
+        };
+        
+        let quizState = {
+            mode: 'daily',
+            currentQuestion: 0,
+            totalQuestions: 10,
+            score: 0,
+            correct: 0,
+            timeLeft: 20,
+            timer: null,
+            selectedAnswer: null,
+            hintsUsed: 0,
+            totalHintsUsed: 0,
+            answers: [],
+            startTime: null,
+            totalTime: 0
+        };
+        
+        // カラコンデータ
+        const colorContacts = [
+            {
+                id: 1,
+                brand: 'ダスティティー',
+                series: 'ワンデー',
+                color: '玉虫ブラウン',
+                dia: '14.5',
+                gdia: '13.6',
+                bc: '8.6',
+                category: 'ナチュラル系',
+                hint1: '外側のフチが太めで、内側は透明感のあるグラデーション',
+                hint2: '着色直径は13.6mm、ナチュラル系の定番',
+                tip: 'フチで瞳をくっきり見せつつ、中心部の透明感で「うるツヤ」効果を演出',
+                pattern: 'lens-pattern-1'
+            },
+            {
+                id: 2,
+                brand: 'アイグローゼット',
+                series: 'マンスリー',
+                color: 'ほのブラウン',
+                dia: '14.2',
+                gdia: '13.4',
+                bc: '8.7',
+                category: 'ちゅるん系',
+                hint1: '内側にグラデーションが特徴的',
+                hint2: '装用期間は1ヶ月タイプ',
+                tip: '透明感のある発色で自然な「ちゅるん」感を演出',
+                pattern: 'lens-pattern-2'
+            },
+            {
+                id: 3,
+                brand: 'ハニーミス',
+                series: 'ワンデー',
+                color: 'ちゃんみブラウン',
+                dia: '14.0',
+                gdia: '13.2',
+                bc: '8.6',
+                category: '韓国っぽ',
+                hint1: '細フチデザインでトレンド感',
+                hint2: 'DIAは14.0mmとやや小さめ',
+                tip: 'K-POPアイドルのような韓国風メイクにぴったり',
+                pattern: 'lens-pattern-3'
+            },
+            {
+                id: 4,
+                brand: 'ミーシール',
+                series: 'ワンデー',
+                color: 'ふだんブラウン',
+                dia: '14.2',
+                gdia: '13.4',
+                bc: '8.6',
+                category: 'オフィス系',
+                hint1: '派手すぎない自然な発色',
+                hint2: 'オフィスでも使いやすい',
+                tip: '職場でも浮かない、品のある瞳を演出',
+                pattern: 'lens-pattern-4'
+            }
+        ];
+        
+        // 現在の問題
+        let currentQuizData = [];
+        let currentCorrectAnswer = null;
+        
+        // 時刻更新
+        function updateTime() {
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('currentTime').textContent = `${hours}:${minutes}`;
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+        
+        // ログイン処理
+        function login() {
+            const name = document.getElementById('userName').value;
+            const store = document.getElementById('userStore').value;
+            
+            if (!name) {
+                alert('お名前を入力してください');
+                return;
+            }
+            
+            currentUser.name = name + 'ちゃん';
+            currentUser.store = store;
+            
+            document.getElementById('displayName').textContent = currentUser.name;
+            document.getElementById('displayStore').textContent = currentUser.store;
+            document.getElementById('userLevel').textContent = currentUser.level;
+            document.getElementById('userPoints').textContent = currentUser.points;
+            document.getElementById('userStreak').textContent = currentUser.streak;
+            
+            showPage('homePage');
+            document.getElementById('bottomNav').style.display = 'flex';
+        }
+        
+        // ページ切り替え
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            document.getElementById(pageId).classList.add('active');
+        }
+        
+        // デイリークイズ開始
+        function startDailyQuiz() {
+            quizState.mode = 'daily';
+            initQuiz();
+        }
+        
+        // 練習モード開始
+        function startPractice() {
+            quizState.mode = 'practice';
+            initQuiz();
+        }
+        
+        // クイズ初期化
+        function initQuiz() {
+            quizState.currentQuestion = 0;
+            quizState.score = 0;
+            quizState.correct = 0;
+            quizState.hintsUsed = 0;
+            quizState.totalHintsUsed = 0;
+            quizState.answers = [];
+            quizState.startTime = Date.now();
+            quizState.totalTime = 0;
+            
+            showPage('quizPage');
+            loadQuestion();
+        }
+        
+        // 問題読み込み
+        function loadQuestion() {
+            quizState.currentQuestion++;
+            quizState.selectedAnswer = null;
+            quizState.hintsUsed = 0;
+            quizState.timeLeft = 20;
+            
+            // UI更新
+            document.getElementById('currentQuestion').textContent = quizState.currentQuestion;
+            document.getElementById('quizProgress').style.width = `${(quizState.currentQuestion / quizState.totalQuestions) * 100}%`;
+            document.getElementById('hint1Btn').classList.remove('used');
+            document.getElementById('hint2Btn').classList.remove('used');
+            document.getElementById('hint1Btn').disabled = false;
+            document.getElementById('hint2Btn').disabled = false;
+            document.getElementById('hintDisplay').classList.remove('show');
+            document.getElementById('hintDisplay').textContent = '';
+            document.getElementById('submitBtn').disabled = false;
+            
+            // ランダムに問題選択
+            const randomIndex = Math.floor(Math.random() * colorContacts.length);
+            currentCorrectAnswer = colorContacts[randomIndex];
+            
+            // レンズパターン設定
+            document.getElementById('leftLens').className = 'lens-image ' + currentCorrectAnswer.pattern;
+            document.getElementById('rightLens').className = 'lens-image ' + currentCorrectAnswer.pattern;
+            
+            // 選択肢生成
+            const options = generateOptions(currentCorrectAnswer);
+            displayOptions(options);
+            
+            // タイマー開始
+            startTimer();
+        }
+        
+        // 選択肢生成
+        function generateOptions(correct) {
+            const options = [correct];
+            const used = [correct.id];
+            
+            while (options.length < 4) {
+                const random = colorContacts[Math.floor(Math.random() * colorContacts.length)];
+                if (!used.includes(random.id)) {
+                    options.push(random);
+                    used.push(random.id);
+                }
+            }
+            
+            // シャッフル
+            return options.sort(() => Math.random() - 0.5);
+        }
+        
+        // 選択肢表示
+        function displayOptions(options) {
+            const container = document.getElementById('answerOptions');
+            container.innerHTML = '';
+            
+            options.forEach((option, index) => {
+                const div = document.createElement('div');
+                div.className = 'answer-option';
+                div.dataset.id = option.id;
+                div.innerHTML = `
+                    <div class="answer-radio"></div>
+                    <div class="answer-text">${option.brand} ${option.color}</div>
+                `;
+                div.onclick = () => selectAnswer(option.id, div);
+                container.appendChild(div);
+            });
+        }
+        
+        // 回答選択
+        function selectAnswer(id, element) {
+            document.querySelectorAll('.answer-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            element.classList.add('selected');
+            quizState.selectedAnswer = id;
+        }
+        
+        // ヒント表示
+        function showHint(num) {
+            const btn = document.getElementById(`hint${num}Btn`);
+            if (btn.classList.contains('used')) return;
+            
+            btn.classList.add('used');
+            btn.disabled = true;
+            quizState.hintsUsed++;
+            quizState.totalHintsUsed++;
+            
+            const hintDisplay = document.getElementById('hintDisplay');
+            const currentHint = hintDisplay.textContent;
+            const newHint = num === 1 ? currentCorrectAnswer.hint1 : currentCorrectAnswer.hint2;
+            
+            hintDisplay.textContent = currentHint ? `${currentHint}\n${newHint}` : newHint;
+            hintDisplay.classList.add('show');
+        }
+        
+        // タイマー
+        function startTimer() {
+            clearInterval(quizState.timer);
+            
+            quizState.timer = setInterval(() => {
+                quizState.timeLeft--;
+                document.getElementById('timeLeft').textContent = quizState.timeLeft;
+                
+                if (quizState.timeLeft <= 5) {
+                    document.getElementById('timer').classList.add('warning');
+                } else {
+                    document.getElementById('timer').classList.remove('warning');
+                }
+                
+                if (quizState.timeLeft <= 0) {
+                    clearInterval(quizState.timer);
+                    submitAnswer(true);
+                }
+            }, 1000);
+        }
+        
+        // 回答送信
+        function submitAnswer(timeout = false) {
+            clearInterval(quizState.timer);
+            document.getElementById('submitBtn').disabled = true;
+            
+            const isCorrect = !timeout && quizState.selectedAnswer === currentCorrectAnswer.id;
+            
+            if (isCorrect) {
+                let points = 10;
+                if (quizState.hintsUsed === 1) points = 8;
+                if (quizState.hintsUsed === 2) points = 6;
+                
+                quizState.score += points;
+                quizState.correct++;
+            }
+            
+            // 回答記録
+            quizState.answers.push({
+                question: currentCorrectAnswer,
+                selected: quizState.selectedAnswer,
+                correct: isCorrect,
+                time: 20 - quizState.timeLeft,
+                hints: quizState.hintsUsed
+            });
+            
+            // フィードバック表示
+            showFeedback(isCorrect);
+        }
+        
+        // フィードバック表示
+        function showFeedback(isCorrect) {
+            const modal = document.getElementById('feedbackModal');
+            const icon = document.getElementById('feedbackIcon');
+            const title = document.getElementById('feedbackTitle');
+            const answer = document.getElementById('feedbackAnswer');
+            const specs = document.getElementById('feedbackSpecs');
+            const tip = document.getElementById('feedbackTip');
+            
+            if (isCorrect) {
+                icon.textContent = '🎉';
+                icon.className = 'feedback-icon correct';
+                title.textContent = '正解！';
+                title.style.color = '#4CAF50';
+            } else {
+                icon.textContent = '❌';
+                icon.className = 'feedback-icon';
+                title.textContent = '不正解';
+                title.style.color = '#F44336';
+            }
+            
+            answer.textContent = `${currentCorrectAnswer.brand} ${currentCorrectAnswer.color}`;
+            specs.textContent = `DIA ${currentCorrectAnswer.dia} / G.DIA ${currentCorrectAnswer.gdia} / BC ${currentCorrectAnswer.bc}`;
+            tip.innerHTML = `💡 ${currentCorrectAnswer.tip}`;
+            
+            modal.classList.add('show');
+        }
+        
+        // 次の問題へ
+        function nextQuestion() {
+            document.getElementById('feedbackModal').classList.remove('show');
+            
+            if (quizState.currentQuestion >= quizState.totalQuestions) {
+                showResult();
+            } else {
+                loadQuestion();
+            }
+        }
+        
+        // 結果表示
+        function showResult() {
+            quizState.totalTime = Math.floor((Date.now() - quizState.startTime) / 1000);
+            
+            const accuracy = Math.round((quizState.correct / quizState.totalQuestions) * 100);
+            const avgTime = Math.round(quizState.totalTime / quizState.totalQuestions * 10) / 10;
+            
+            // 結果に応じた表示
+            let emoji, title, message;
+            if (accuracy >= 90) {
+                emoji = '🏆';
+                title = '完璧！';
+                message = 'カラコンマスターの称号にふさわしい成績です！';
+            } else if (accuracy >= 70) {
+                emoji = '🎉';
+                title = '素晴らしい！';
+                message = 'とても良い成績です。この調子で頑張りましょう！';
+            } else if (accuracy >= 50) {
+                emoji = '😊';
+                title = 'よくできました！';
+                message = 'もう少しで目標達成です。復習して再挑戦しましょう！';
+            } else {
+                emoji = '💪';
+                title = '頑張りましょう！';
+                message = '練習モードで復習してから再挑戦してみましょう！';
+            }
+            
+            document.getElementById('resultEmoji').textContent = emoji;
+            document.getElementById('resultTitle').textContent = title;
+            document.getElementById('resultScore').textContent = `${quizState.score}点`;
+            document.getElementById('resultMessage').innerHTML = `${quizState.totalQuestions}問中${quizState.correct}問正解！<br>${message}`;
+            document.getElementById('accuracyRate').textContent = `${accuracy}%`;
+            document.getElementById('avgTime').textContent = `${avgTime}秒`;
+            document.getElementById('hintsUsed').textContent = `${quizState.totalHintsUsed}回`;
+            document.getElementById('earnedPoints').textContent = `+${quizState.score}pt`;
+            
+            // 間違えた問題リスト
+            const mistakes = quizState.answers.filter(a => !a.correct);
+            if (mistakes.length > 0) {
+                document.getElementById('mistakeDetails').style.display = 'block';
+                const mistakeList = document.getElementById('mistakeList');
+                mistakeList.innerHTML = mistakes.map(m => `
+                    <div class="mistake-item">
+                        <strong>${m.question.brand} ${m.question.color}</strong><br>
+                        カテゴリー：${m.question.category}
+                    </div>
+                `).join('');
+            } else {
+                document.getElementById('mistakeDetails').style.display = 'none';
+            }
+            
+            // ポイント更新
+            if (quizState.mode === 'daily') {
+                currentUser.points += quizState.score;
+                document.getElementById('userPoints').textContent = currentUser.points;
+                
+                // 進捗更新
+                const progressPercent = accuracy;
+                document.getElementById('todayProgress').style.width = `${progressPercent}%`;
+                document.getElementById('todayProgress').textContent = `${progressPercent}%`;
+                document.getElementById('todayStatus').textContent = `${quizState.correct}/10問正解 • 正答率 ${accuracy}%`;
+            }
+            
+            showPage('resultPage');
+        }
+        
+        // ホームに戻る
+        function backToHome() {
+            showPage('homePage');
+        }
+        
+        // 間違えた問題を復習
+        function reviewMistakes() {
+            alert('復習機能は開発中です！');
+        }
+        
+        // ランキング表示
+        function showRanking() {
+            showPage('rankingPage');
+        }
+        
+        // ランキングタブ切り替え
+        function switchRankingTab(type, element) {
+            document.querySelectorAll('.ranking-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            element.classList.add('active');
+            
+            // タブに応じたデータ更新（デモなので固定）
+            console.log('Switching to', type, 'ranking');
+        }
+        
+        // 成績表示
+        function showStats() {
+            alert('マイ成績機能は開発中です！');
+        }
+        
+        // ナビゲーション
+        function navigateTo(page) {
+            switch(page) {
+                case 'home':
+                    showPage('homePage');
+                    break;
+                case 'quiz':
+                    startDailyQuiz();
+                    break;
+                case 'ranking':
+                    showRanking();
+                    break;
+                case 'profile':
+                    showStats();
+                    break;
+            }
+            
+            // ナビゲーションアイテムの状態更新
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
+    </script>
+</body>
+</html>

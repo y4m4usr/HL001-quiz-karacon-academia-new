@@ -1,0 +1,24 @@
+{
+  "name": "Login Helper",
+  "description": "ログイン支援拡張機能",
+  "version": "1.0.0",
+  "manifest_version": 3,
+
+  "background": {
+    "service_worker": "service_worker.js"
+  },
+
+  "permissions": ["storage"],
+
+  "host_permissions": [
+    "https://script.google.com/macros/s/AKfycbwrHaV_KNVfCmI_UnvARPDHigJnpm_6Xo_gu1q0Betj3YanDvueFuVwm4R2G4s1TnhXNA/exec*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["https://script.google.com/macros/s/AKfycbwrHaV_KNVfCmI_UnvARPDHigJnpm_6Xo_gu1q0Betj3YanDvueFuVwm4R2G4s1TnhXNA/exec*"],
+      "js": ["content/login-bridge.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
