@@ -57,7 +57,7 @@
                     <label for="userName">会員名</label>
                     <input type="text" id="userName" placeholder="例：山田花子">
                 </div>
-                <button id="loginBtn" class="btn btn-primary">ログイン</button>
+                <button id="loginBtn" class="btn btn-primary" type="button">ログイン</button>
             </div>
         </div>
 
@@ -256,6 +256,14 @@
             clearInterval(state.timer);
             const q = state.quizData[state.currentQuestionIndex];
             const isCorrect = !isTimeout && state.selectedAnswerKey === q.correctAnswer;
+            
+            // 回答を記録
+            state.answers.push({
+                question: q,
+                selected: state.selectedAnswerKey,
+                isCorrect: isCorrect,
+                time: 20 - state.timeLeft
+            });
 
             showFeedback(isCorrect, isTimeout, q.correctAnswer);
             
@@ -286,8 +294,10 @@
         }
         
         function finishQuiz() {
+            const correctCount = state.answers.filter(a => a.isCorrect).length;
+            const score = correctCount * 10; // 簡単なスコア計算
+            document.getElementById('finalScore').textContent = score;
             showPage('result');
-            document.getElementById('finalScore').textContent = '計算中...'; // ここでスコア計算
         }
 
         // --- 画像エラー処理 ---
@@ -309,7 +319,7 @@
             UI.buttons.submit.onclick = () => submitAnswer(false);
             UI.buttons.toHome.onclick = () => showPage('home');
             
-            showPage('login'); // ★★★★★ アプリ起動時は必ずログイン画面から開始
+            showPage('login');
             console.log('アプリケーションが初期化されました。');
         }
 
