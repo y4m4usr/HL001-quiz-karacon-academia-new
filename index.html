@@ -6,45 +6,85 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quiz☆カラコンアカデミア</title>
     <style>
-        /* 基本リセット */
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(180deg, #fff2f7, #fffafc);
-            min-height: 100vh;
-            padding: 20px;
-            line-height: 1.5;
-        }
-        .shell { max-width: 480px; margin: 0 auto; }
-        .hidden { display: none !important; }
-        /* --- 以下、主要なスタイル (省略) --- */
-        .hero { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding: 16px; background: white; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        .logo { width: 56px; height: 56px; border-radius: 12px; background: linear-gradient(135deg, #FF6EC7, #FF9472); display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; }
-        .hero-text h1 { font-size: 18px; }
-        .card { background: white; border-radius: 20px; padding: 24px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); margin-bottom: 20px; }
-        .input-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: 500; }
-        input { width: 100%; padding: 14px 16px; border: 2px solid #E0E0E0; border-radius: 12px; font-size: 16px; }
-        .btn { padding: 16px 24px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; text-align: center; }
-        .btn-primary { background: linear-gradient(135deg, #FF6EC7, #FF9472); color: white; }
-        .btn-secondary { background: #E3F2FD; color: #1565C0; }
-        .quiz-header { background: linear-gradient(135deg, #FF6EC7, #FF9472); color: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; }
-        .quiz-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .progress-bar { background: rgba(255,255,255,0.3); height: 8px; border-radius: 4px; overflow: hidden; }
-        .progress-fill { background: white; height: 100%; transition: width 0.5s ease; }
-        .lens-display { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; }
-        .lens-image { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid #FFD2EC; }
-        .answer-options { display: grid; gap: 12px; }
-        .answer-option { background: white; border: 2px solid #E0E0E0; border-radius: 12px; padding: 16px; cursor: pointer; }
-        .answer-option.selected { border-color: #FF6EC7; background: #FFE3F2; }
-        .feedback-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .feedback-card { background: white; padding: 32px; border-radius: 24px; text-align: center; }
-        .feedback-correct { border: 4px solid #4CAF50; }
-        .feedback-incorrect { border: 4px solid #F44336; }
+        /* [omitted for brevity] UIのスタイルは変更ありません */
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:linear-gradient(180deg,#fff2f7,#fffafc);min-height:100vh;padding:20px;line-height:1.5;margin:0;box-sizing:border-box}
+        .shell{max-width:480px;margin:0 auto}
+        .hero{display:flex;align-items:center;gap:16px;margin-bottom:24px;padding:16px;background:white;border-radius:20px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}
+        .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#FF6EC7,#FF9472);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
+        .hero-text h1{font-size:18px;font-weight:700;color:#333;margin-bottom:4px}
+        .api{color:#999;font-size:12px}
+        .card{background:white;border-radius:20px;padding:24px;box-shadow:0 6px 20px rgba(0,0,0,0.06);margin-bottom:20px}
+        .card h2{margin-bottom:20px;color:#333}
+        .input-group{margin-bottom:20px}
+        label{display:block;margin-bottom:8px;color:#666;font-size:14px;font-weight:500}
+        input{width:100%;padding:14px 16px;border:2px solid #E0E0E0;border-radius:12px;font-size:16px;background:white;transition:border-color .2s ease;box-sizing:border-box}
+        input:focus{outline:none;border-color:#FF6EC7;box-shadow:0 0 0 3px rgba(255,110,199,0.1)}
+        .btn{padding:16px 24px;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;width:100%;transition:all .2s ease;text-align:center;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+        .btn-primary{background:linear-gradient(135deg,#FF6EC7,#FF9472);color:white;box-shadow:0 4px 12px rgba(255,110,199,0.3)}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,110,199,0.4)}
+        .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+        .stat-card{text-align:center;padding:16px;border-radius:12px;background:rgba(255,255,255,0.2)}
+        .stat-value{font-size:24px;font-weight:bold;margin-bottom:4px}
+        .stat-label{font-size:12px;opacity:0.8}
+        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .quiz-header{background:linear-gradient(135deg,#FF6EC7,#FF9472);color:white;padding:20px;border-radius:20px;margin-bottom:20px}
+        .quiz-info{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+        .timer{background:rgba(255,255,255,0.2);padding:8px 16px;border-radius:20px;font-weight:bold;font-size:14px}
+        .timer.warning{background:#FF4444;animation:pulse 1s infinite}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
+        .progress-bar{background:rgba(255,255,255,0.3);height:8px;border-radius:4px;overflow:hidden}
+        .progress-fill{background:white;height:100%;transition:width .5s ease}
+        .lens-container{text-align:center;margin-bottom:24px}
+        .lens-label{font-size:16px;color:#666;margin-bottom:20px;font-weight:500}
+        .lens-display{display:flex;justify-content:center;gap:20px;margin-bottom:20px}
+        .lens-image{width:120px;height:120px;border-radius:50%;box-shadow:0 8px 24px rgba(0,0,0,0.15);object-fit:cover;border:4px solid #FFD2EC}
+        .hint-buttons{display:flex;gap:12px;margin-bottom:20px}
+        .hint-btn{flex:1;padding:12px 16px;background:#FFF0F8;border:2px solid #FFD2EC;border-radius:12px;color:#FF6EC7;cursor:pointer;font-weight:600;font-size:14px;transition:all .2s ease}
+        .hint-btn:hover{background:#FFE3F2}
+        .hint-btn.used{background:#FFD2EC;opacity:0.6;cursor:not-allowed}
+        .hint-display{display:none;background:#FFF9E6;border:2px solid #FFE59E;border-radius:12px;padding:16px;margin-bottom:20px;color:#8B6914;font-size:14px;white-space:pre-line;line-height:1.6}
+        .hint-display.show{display:block;animation:slideDown .3s ease}
+        @keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+        .answer-options{display:grid;gap:12px;margin-bottom:24px}
+        .answer-option{background:white;border:2px solid #E0E0E0;border-radius:12px;padding:16px;cursor:pointer;transition:all .3s ease;display:flex;align-items:center;gap:12px}
+        .answer-option:hover{border-color:#FF6EC7;background:#FFF0F8;transform:translateY(-1px)}
+        .answer-option.selected{border-color:#FF6EC7;background:#FFE3F2;transform:translateY(-2px);box-shadow:0 4px 12px rgba(255,110,199,0.2)}
+        .answer-radio{width:20px;height:20px;border:2px solid #E0E0E0;border-radius:50%;position:relative;transition:all .2s ease;flex-shrink:0}
+        .answer-option.selected .answer-radio{border-color:#FF6EC7;background:#FF6EC7}
+        .answer-option.selected .answer-radio::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;background:white;border-radius:50%}
+        .feedback-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fadeIn .3s ease}
+        .feedback-card{background:white;padding:32px;border-radius:24px;text-align:center;max-width:320px;margin:20px;box-shadow:0 12px 40px rgba(0,0,0,0.3);animation:scaleIn .3s ease}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes scaleIn{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}
+        .feedback-correct{border:4px solid #4CAF50}
+        .feedback-incorrect{border:4px solid #F44336}
+        .feedback-icon{font-size:48px;margin-bottom:16px}
+        .feedback-title{font-size:24px;font-weight:bold;margin-bottom:12px}
+        .feedback-message{color:#666;margin-bottom:24px}
+        .hidden{display:none!important}
+        .text-center{text-align:center}
+        .ranking-list{max-height:400px;overflow-y:auto}
+        .ranking-item{display:flex;align-items:center;padding:12px 0;border-bottom:1px solid #eee}
+        .ranking-item:last-child{border-bottom:none}
+        .ranking-medal{font-size:18px;width:50px;text-align:center;flex-shrink:0}
+        .ranking-info{flex:1;margin:0 12px}
+        .ranking-name{font-weight:600;margin-bottom:2px}
+        .ranking-detail{font-size:12px;color:#666}
+        .ranking-score{font-weight:bold;color:#FF6EC7;font-size:16px}
+        .user-highlight{background:#FFF0F8;border-radius:8px;padding:8px;margin:-8px}
     </style>
 </head>
 <body>
     <div class="shell">
+        <!-- ヒーローヘッダー -->
+        <div class="hero">
+            <div class="logo">👁️</div>
+            <div class="hero-text">
+                <h1>Quiz☆カラコンアカデミア</h1>
+                <div class="api">ホテラバ presents v2.4</div>
+            </div>
+        </div>
+
         <!-- ログイン画面 -->
         <div id="loginPage" class="page">
             <div class="card">
@@ -57,33 +97,74 @@
                     <label for="userName">会員名</label>
                     <input type="text" id="userName" placeholder="例：山田花子">
                 </div>
-                <button id="loginBtn" class="btn btn-primary" type="button">ログイン</button>
+                <button id="loginBtn" class="btn btn-primary">ログイン</button>
             </div>
         </div>
 
         <!-- ホーム画面 -->
         <div id="homePage" class="page hidden">
+            <div class="card" style="background: linear-gradient(135deg, #FF6EC7, #FF9472); color: white;">
+                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                    <div style="width: 56px; height: 56px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px;">👤</div>
+                    <div>
+                        <div style="font-size: 20px; font-weight: bold;" id="displayName">-</div>
+                        <div style="font-size: 14px;" id="userLevel">Lv.1 スタッフ</div>
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="userPoints">0</div>
+                        <div class="stat-label">ポイント</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="userStreak">0日</div>
+                        <div class="stat-label">連続</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="todayBest">-</div>
+                        <div class="stat-label">本日</div>
+                    </div>
+                </div>
+            </div>
             <div class="card">
-                 <h2>ホーム</h2>
-                 <p id="welcomeMessage"></p>
-                 <button id="startPracticeBtn" class="btn btn-secondary">練習モード開始</button>
+                <div class="grid-2">
+                    <button id="startDailyBtn" class="btn btn-primary">📅 デイリーチャレンジ</button>
+                    <button id="startPracticeBtn" class="btn" style="background:#E3F2FD;color:#1565C0;">🎯 練習モード</button>
+                </div>
+                <div class="grid-2" style="margin-top:12px">
+                    <button id="rankingBtn" class="btn" style="background:#FFF3E0;color:#F57C00;">🏆 ランキング</button>
+                    <button id="myPageBtn" class="btn" style="background:#F3E5F5;color:#7B1FA2;">📊 マイ成績</button>
+                </div>
             </div>
         </div>
 
         <!-- クイズ画面 -->
         <div id="quizPage" class="page hidden">
-            <div class="quiz-header">
+             <div class="quiz-header">
                 <div class="quiz-info">
                     <div>Question <span id="currentQuestionNum">1</span>/10</div>
-                    <div id="timer">⏱ <span id="timeLeft">20</span>秒</div>
+                    <div class="timer" id="timer">
+                        <span>⏱</span>
+                        <span id="timeLeft">20</span>秒
+                    </div>
                 </div>
-                <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 10%;"></div>
+                </div>
             </div>
             <div class="card">
-                <div class="lens-display">
-                    <img class="lens-image" id="leftLens" alt="レンズ画像1">
-                    <img class="lens-image" id="rightLens" alt="レンズ画像2">
+                <div class="lens-container">
+                    <div class="lens-label">このカラコンは何？</div>
+                    <div class="lens-display">
+                        <img class="lens-image" id="leftLens" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E" alt="左レンズ">
+                        <img class="lens-image" id="rightLens" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E" alt="右レンズ">
+                    </div>
                 </div>
+                <div class="hint-buttons">
+                    <button class="hint-btn" id="hint1Btn">💡 ヒント1</button>
+                    <button class="hint-btn" id="hint2Btn">💡 ヒント2</button>
+                </div>
+                <div class="hint-display" id="hintDisplay"></div>
                 <div class="answer-options" id="answerOptions"></div>
                 <button class="btn btn-primary" id="submitBtn">回答する</button>
             </div>
@@ -91,243 +172,280 @@
 
         <!-- 結果画面 -->
         <div id="resultPage" class="page hidden">
-            <div class="card">
-                <h2>結果</h2>
-                <p>スコア: <span id="finalScore">0</span>点</p>
-                <button id="homeBtn" class="btn btn-primary">ホームへ戻る</button>
+            <div class="card text-center">
+                <h2 style="color: #FF6EC7;">クイズ完了！</h2>
+                <div style="font-size: 48px; margin: 20px 0;">🎉</div>
+                <p style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">
+                    スコア: <span id="finalScore">0</span>点
+                </p>
+                <p style="color: #666; margin-bottom: 20px;">
+                    10問中 <span id="correctCount">0</span>問正解
+                </p>
+                <div class="grid-2">
+                    <button class="btn btn-primary" onclick="App.showPage('homePage')">ホームへ戻る</button>
+                    <button class="btn" style="background:#E3F2FD;color:#1565C0;" onclick="App.restartQuiz()">もう一度</button>
+                </div>
             </div>
         </div>
-        
+
+        <!-- ランキング/マイページ画面 (暫定) -->
+        <div id="rankingPage" class="page hidden"><div class="card"><h2>🏆 ランキング (準備中)</h2><button class="btn btn-primary" onclick="App.showPage('homePage')">戻る</button></div></div>
+        <div id="myPage" class="page hidden"><div class="card"><h2>📊 マイ成績 (準備中)</h2><button class="btn btn-primary" onclick="App.showPage('homePage')">戻る</button></div></div>
+
         <!-- フィードバック表示 -->
         <div id="feedbackOverlay" class="feedback-overlay hidden">
             <div class="feedback-card" id="feedbackCard">
-                <div id="feedbackTitle" style="font-size: 24px; font-weight: bold;"></div>
-                <div id="feedbackMessage"></div>
+                <div class="feedback-icon" id="feedbackIcon"></div>
+                <div id="feedbackTitle" class="feedback-title"></div>
+                <div id="feedbackMessage" class="feedback-message"></div>
             </div>
         </div>
     </div>
 
-    <script>
-    // ===================================================================
-    // アプリケーションメインスクリプト (単一ファイル版)
-    // ===================================================================
-    const App = (() => {
-        'use strict';
+<script>
+const App = (() => {
+    'use strict';
+    // 状態管理
+    const state = {
+        currentUser: null, questions: [], currentQuestionIndex: 0,
+        selectedAnswer: null, timer: null, timeLeft: 20,
+        hintsUsed: { h1: false, h2: false }, gameMode: 'practice',
+        answers: [] // 回答履歴を保存する配列を追加
+    };
+    // UI要素
+    const UI = {
+        pages: document.querySelectorAll('.page'),
+        staffId: document.getElementById('staffId'),
+        userName: document.getElementById('userName'),
+        loginBtn: document.getElementById('loginBtn'),
+        displayName: document.getElementById('displayName'),
+        userLevel: document.getElementById('userLevel'),
+        startDailyBtn: document.getElementById('startDailyBtn'),
+        startPracticeBtn: document.getElementById('startPracticeBtn'),
+        rankingBtn: document.getElementById('rankingBtn'),
+        myPageBtn: document.getElementById('myPageBtn'),
+        currentQuestionNum: document.getElementById('currentQuestionNum'),
+        timeLeft: document.getElementById('timeLeft'),
+        timer: document.getElementById('timer'),
+        progressFill: document.getElementById('progressFill'),
+        leftLens: document.getElementById('leftLens'),
+        rightLens: document.getElementById('rightLens'),
+        hint1Btn: document.getElementById('hint1Btn'),
+        hint2Btn: document.getElementById('hint2Btn'),
+        hintDisplay: document.getElementById('hintDisplay'),
+        answerOptions: document.getElementById('answerOptions'),
+        submitBtn: document.getElementById('submitBtn'),
+        finalScore: document.getElementById('finalScore'),
+        correctCount: document.getElementById('correctCount'),
+        feedbackOverlay: document.getElementById('feedbackOverlay'),
+        feedbackCard: document.getElementById('feedbackCard'),
+        feedbackIcon: document.getElementById('feedbackIcon'),
+        feedbackTitle: document.getElementById('feedbackTitle'),
+        feedbackMessage: document.getElementById('feedbackMessage'),
+    };
+    // ページ表示切替
+    function showPage(pageId) {
+        UI.pages.forEach(p => p.classList.add('hidden'));
+        const page = document.getElementById(pageId);
+        if(page) page.classList.remove('hidden');
+    }
 
-        // --- 状態管理 ---
-        const state = {
-            currentUser: null,
-            quizData: null,
-            currentQuestionIndex: 0,
-            selectedAnswerKey: null,
-            answers: [],
-            timer: null,
-            timeLeft: 20
-        };
-
-        // --- DOM要素キャッシュ ---
-        const UI = {
-            pages: {
-                login: document.getElementById('loginPage'),
-                home: document.getElementById('homePage'),
-                quiz: document.getElementById('quizPage'),
-                result: document.getElementById('resultPage')
-            },
-            buttons: {
-                login: document.getElementById('loginBtn'),
-                startPractice: document.getElementById('startPracticeBtn'),
-                submit: document.getElementById('submitBtn'),
-                toHome: document.getElementById('homeBtn')
-            },
-            quiz: {
-                currentNum: document.getElementById('currentQuestionNum'),
-                progressFill: document.getElementById('progressFill'),
-                timeLeft: document.getElementById('timeLeft'),
-                leftLens: document.getElementById('leftLens'),
-                rightLens: document.getElementById('rightLens'),
-                optionsContainer: document.getElementById('answerOptions')
-            },
-            feedback: {
-                overlay: document.getElementById('feedbackOverlay'),
-                card: document.getElementById('feedbackCard'),
-                title: document.getElementById('feedbackTitle'),
-                message: document.getElementById('feedbackMessage')
-            },
-            welcomeMessage: document.getElementById('welcomeMessage')
-        };
-
-        // --- ページ表示 ---
-        function showPage(pageId) {
-            Object.values(UI.pages).forEach(p => p.classList.add('hidden'));
-            if (UI.pages[pageId]) {
-                UI.pages[pageId].classList.remove('hidden');
-            }
-        }
-
-        // --- ログイン処理 ---
-        function handleLogin() {
-            const staffId = document.getElementById('staffId').value;
-            const userName = document.getElementById('userName').value;
-            if (!staffId || !userName) {
-                alert('会員番号と会員名を入力してください。');
-                return;
-            }
-            state.currentUser = { staffId, name: userName };
-            UI.welcomeMessage.textContent = `${userName}さん、ようこそ！`;
-            showPage('home');
-        }
-
-        // --- クイズ開始 ---
-        function startQuiz() {
-            showPage('quiz');
-            UI.quiz.optionsContainer.innerHTML = '<p>問題を取得中です...</p>';
-
-            google.script.run
-                .withSuccessHandler(onQuestionsLoaded)
-                .withFailureHandler(onQuestionsFailed)
-                .getQuestions({ count: 10 });
-        }
-
-        function onQuestionsLoaded(questions) {
-            if (!questions || questions.length === 0) {
-                return onQuestionsFailed({ message: 'サーバーから問題を取得できませんでした。' });
-            }
-            state.quizData = questions;
-            state.currentQuestionIndex = 0;
-            state.answers = [];
-            loadQuestion();
-        }
-
-        function onQuestionsFailed(error) {
-            alert('エラー: ' + error.message);
-            showPage('home');
-        }
-
-        // --- 問題読み込み ---
-        function loadQuestion() {
-            if (state.currentQuestionIndex >= state.quizData.length) {
-                return finishQuiz();
-            }
-            const q = state.quizData[state.currentQuestionIndex];
-            
-            UI.quiz.currentNum.textContent = state.currentQuestionIndex + 1;
-            UI.quiz.progressFill.style.width = `${(state.currentQuestionIndex + 1) * 10}%`;
-            
-            setImgSafe(UI.quiz.leftLens, q.imgL, 'Lens');
-            setImgSafe(UI.quiz.rightLens, q.imgR, 'Lens');
-
-            const optsContainer = UI.quiz.optionsContainer;
-            optsContainer.innerHTML = '';
-            q.options.forEach(optionKey => {
-                const div = document.createElement('div');
-                div.className = 'answer-option';
-                div.dataset.key = optionKey;
-                div.textContent = optionKey;
-                div.onclick = () => selectOption(div);
-                optsContainer.appendChild(div);
-            });
-
-            state.selectedAnswerKey = null;
-            startTimer();
-        }
-
-        function selectOption(el) {
-            document.querySelectorAll('.answer-option').forEach(opt => opt.classList.remove('selected'));
-            el.classList.add('selected');
-            state.selectedAnswerKey = el.dataset.key;
-        }
+    // ★ 新設: Base64画像プロキシ経由で画像を設定する関数
+    async function fetchAndSetImage(imgElement, proxyUrl) {
+        // まずプレースホルダーを表示
+        const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E";
+        imgElement.src = placeholder;
         
-        // --- タイマー ---
-        function startTimer() {
-            state.timeLeft = 20;
-            UI.quiz.timeLeft.textContent = state.timeLeft;
-            clearInterval(state.timer);
-            state.timer = setInterval(() => {
-                state.timeLeft--;
-                UI.quiz.timeLeft.textContent = state.timeLeft;
-                if (state.timeLeft <= 0) {
-                    submitAnswer(true);
-                }
-            }, 1000);
+        if (!proxyUrl) {
+            console.error('Proxy URL is null');
+            imgElement.src = placeholder.replace('Loading...', 'Error');
+            return;
         }
 
-        // --- 回答処理 ---
-        function submitAnswer(isTimeout = false) {
-            clearInterval(state.timer);
-            const q = state.quizData[state.currentQuestionIndex];
-            const isCorrect = !isTimeout && state.selectedAnswerKey === q.correctAnswer;
+        try {
+            // fetchを使ってGASのdoGetを叩く
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error('Network response was not ok');
             
-            // 回答を記録
-            state.answers.push({
-                question: q,
-                selected: state.selectedAnswerKey,
-                isCorrect: isCorrect,
-                time: 20 - state.timeLeft
-            });
-
-            showFeedback(isCorrect, isTimeout, q.correctAnswer);
+            const result = await response.json();
             
-            setTimeout(() => {
-                UI.feedback.overlay.classList.add('hidden');
-                state.currentQuestionIndex++;
-                loadQuestion();
-            }, 2000);
-        }
-
-        function showFeedback(isCorrect, isTimeout, correctLabel) {
-            const fb = UI.feedback;
-            fb.overlay.classList.remove('hidden');
-            fb.card.className = 'feedback-card';
-            
-            if (isTimeout) {
-                fb.title.textContent = 'タイムアウト';
-                fb.message.textContent = `正解: ${correctLabel}`;
-            } else if (isCorrect) {
-                fb.card.classList.add('feedback-correct');
-                fb.title.textContent = '正解！';
-                fb.message.textContent = correctLabel;
+            if (result.success && result.data) {
+                imgElement.src = result.data; // Base64データをセット
             } else {
-                fb.card.classList.add('feedback-incorrect');
-                fb.title.textContent = '不正解';
-                fb.message.textContent = `正解: ${correctLabel}`;
+                throw new Error(result.error || 'Failed to get image data');
             }
+        } catch (error) {
+            console.error('Failed to fetch image:', error);
+            imgElement.src = placeholder.replace('Loading...', 'Error');
         }
+    }
+
+    // クイズ開始
+    function startQuiz(mode) {
+        state.gameMode = mode;
+        state.answers = []; // 回答履歴をリセット
+        showPage('quizPage');
+        UI.submitBtn.disabled = true;
+        UI.submitBtn.textContent = '問題を取得中...';
+
+        google.script.run
+            .withSuccessHandler(questions => {
+                if (!questions || questions.length === 0) {
+                    alert('問題を取得できませんでした。');
+                    showPage('homePage');
+                    return;
+                }
+                state.questions = questions;
+                state.currentQuestionIndex = 0;
+                loadQuestion();
+                UI.submitBtn.disabled = false;
+                UI.submitBtn.textContent = '回答する';
+            })
+            .withFailureHandler(err => {
+                alert(`エラー: ${err.message}`);
+                showPage('homePage');
+                UI.submitBtn.disabled = false;
+                UI.submitBtn.textContent = '回答する';
+            })
+            .getQuestions({ count: 10 });
+    }
+    // 問題読込
+    function loadQuestion() {
+        if (state.currentQuestionIndex >= state.questions.length) {
+            finishQuiz();
+            return;
+        }
+        const q = state.questions[state.currentQuestionIndex];
+        UI.currentQuestionNum.textContent = state.currentQuestionIndex + 1;
+        UI.progressFill.style.width = `${(state.currentQuestionIndex + 1) * 10}%`;
+        state.selectedAnswer = null; // 選択をリセット
+
+        // ★ 修正: fetchAndSetImageを呼び出すように変更
+        fetchAndSetImage(UI.leftLens, q.imgL);
+        fetchAndSetImage(UI.rightLens, q.imgR);
+
+        UI.answerOptions.innerHTML = '';
+        q.options.forEach(opt => {
+            const div = document.createElement('div');
+            div.className = 'answer-option';
+            div.innerHTML = `<div class="answer-radio"></div><div>${opt}</div>`; // ラジオボタン風UIを追加
+            div.dataset.answer = opt;
+            div.onclick = () => selectOption(div);
+            UI.answerOptions.appendChild(div);
+        });
+        resetHints();
+        startTimer();
+    }
+    // 選択肢
+    function selectOption(el) {
+        document.querySelectorAll('.answer-option').forEach(opt => opt.classList.remove('selected'));
+        el.classList.add('selected');
+        state.selectedAnswer = el.dataset.answer;
+    }
+    // タイマー
+    function startTimer() {
+        state.timeLeft = 20;
+        clearInterval(state.timer);
+        UI.timeLeft.textContent = state.timeLeft;
+        UI.timer.classList.remove('warning');
+        state.timer = setInterval(() => {
+            state.timeLeft--;
+            UI.timeLeft.textContent = state.timeLeft;
+            if (state.timeLeft <= 5) UI.timer.classList.add('warning');
+            if (state.timeLeft <= 0) submitAnswer(true);
+        }, 1000);
+    }
+    // 回答
+    function submitAnswer(isTimeout = false) {
+        if (state.selectedAnswer === null && !isTimeout) return; // タイムアウト以外では未選択で送信不可
+        clearInterval(state.timer);
+        const q = state.questions[state.currentQuestionIndex];
+        const isCorrect = state.selectedAnswer === q.correctAnswer;
         
-        function finishQuiz() {
-            const correctCount = state.answers.filter(a => a.isCorrect).length;
-            const score = correctCount * 10; // 簡単なスコア計算
-            document.getElementById('finalScore').textContent = score;
-            showPage('result');
+        // 回答履歴を保存
+        state.answers.push({
+            selected: state.selectedAnswer,
+            correct: q.correctAnswer,
+            isCorrect: isCorrect
+        });
+
+        showFeedback(isCorrect, q.correctAnswer);
+        setTimeout(() => {
+            UI.feedbackOverlay.classList.add('hidden');
+            state.currentQuestionIndex++;
+            loadQuestion();
+        }, 2000);
+    }
+    // フィードバック
+    function showFeedback(isCorrect, correctAnswer) {
+        UI.feedbackCard.className = 'feedback-card';
+        if (isCorrect) {
+            UI.feedbackCard.classList.add('feedback-correct');
+            UI.feedbackIcon.textContent = '🎉';
+            UI.feedbackTitle.textContent = '正解！';
+            UI.feedbackMessage.textContent = correctAnswer;
+        } else {
+            UI.feedbackCard.classList.add('feedback-incorrect');
+            UI.feedbackIcon.textContent = '❌';
+            UI.feedbackTitle.textContent = '不正解...';
+            UI.feedbackMessage.textContent = `正解は: ${correctAnswer}`;
         }
+        UI.feedbackOverlay.classList.remove('hidden');
+    }
+    // クイズ終了
+    function finishQuiz() {
+        const correctCount = state.answers.filter(a => a.isCorrect).length;
+        const score = (correctCount / state.questions.length) * 100;
+        UI.finalScore.textContent = score;
+        UI.correctCount.textContent = correctCount;
+        showPage('resultPage');
+    }
+    // ヒント
+    function showHint(type) {
+        const q = state.questions[state.currentQuestionIndex];
+        const btn = type === 'h1' ? UI.hint1Btn : UI.hint2Btn;
+        const hintText = type === 'h1' ? q.hint1 : q.hint2;
+        if(state.hintsUsed[type] || !hintText) return;
+        
+        state.hintsUsed[type] = true;
+        btn.classList.add('used');
+        UI.hintDisplay.textContent += (UI.hintDisplay.textContent ? '\n\n' : '') + hintText;
+        UI.hintDisplay.classList.add('show');
+    }
+    function resetHints(){
+        state.hintsUsed = {h1: false, h2: false};
+        UI.hint1Btn.classList.remove('used');
+        UI.hint2Btn.classList.remove('used');
+        UI.hintDisplay.textContent = '';
+        UI.hintDisplay.classList.remove('show');
+    }
 
-        // --- 画像エラー処理 ---
-        function inlinePlaceholder(text) {
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150"><rect width="100%" height="100%" fill="#FFD2EC"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="#333">${text || 'Lens'}</text></svg>`;
-            return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-        }
-
-        function setImgSafe(el, url, label) {
-            if (!el) return;
-            el.onerror = function(){ this.onerror=null; this.src = inlinePlaceholder(label); };
-            el.src = url || inlinePlaceholder(label);
-        }
-
-        // --- 初期化 ---
-        function init() {
-            UI.buttons.login.onclick = handleLogin;
-            UI.buttons.startPractice.onclick = startQuiz;
-            UI.buttons.submit.onclick = () => submitAnswer(false);
-            UI.buttons.toHome.onclick = () => showPage('home');
-            
-            showPage('login');
-            console.log('アプリケーションが初期化されました。');
-        }
-
-        return { init };
-    })();
-
-    document.addEventListener('DOMContentLoaded', App.init);
-    </script>
+    // 初期化
+    function init() {
+        UI.loginBtn.onclick = () => {
+            const staffId = UI.staffId.value.trim();
+            const userName = UI.userName.value.trim();
+            if(!staffId || !userName) return alert('情報を入力してください。');
+            state.currentUser = { staffId, userName };
+            UI.displayName.textContent = userName;
+            showPage('homePage');
+        };
+        UI.startDailyBtn.onclick = () => startQuiz('daily');
+        UI.startPracticeBtn.onclick = () => startQuiz('practice');
+        UI.rankingBtn.onclick = () => showPage('rankingPage');
+        UI.myPageBtn.onclick = () => showPage('myPage');
+        UI.hint1Btn.onclick = () => showHint('h1');
+        UI.hint2Btn.onclick = () => showHint('h2');
+        UI.submitBtn.onclick = () => submitAnswer(false);
+    }
+    // 公開API
+    return {
+        init, showPage, state,
+        restartQuiz: () => startQuiz(state.gameMode)
+    };
+})();
+document.addEventListener('DOMContentLoaded', App.init);
+</script>
 </body>
 </html>
-
+gitあっd。
