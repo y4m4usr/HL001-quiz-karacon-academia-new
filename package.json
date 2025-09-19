@@ -1,18 +1,6 @@
 {
-  "name": "hl001-quiz-karacon-academia",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
-    "@types/google-apps-script": "^2.0.1"
+    "@types/chrome": "^0.1.12"
   }
 }
+  
