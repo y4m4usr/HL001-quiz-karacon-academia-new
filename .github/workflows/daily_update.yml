@@ -1,0 +1,40 @@
+# .github/workflows/daily_update.yml として保存
+
+name: Daily Image Update
+
+on:
+  schedule:
+    # 毎日午前2時（JST）
+    - cron: '0 17 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        pip install gspread google-auth google-auth-oauthlib
+        pip install google-auth-httplib2 Pillow requests
+    
+    - name: Run update script
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+      run: |
+        echo "$GOOGLE_CREDENTIALS" > credentials.json
+        python scripts/update_images.py
+    
+    - name: Commit changes
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add images/
+        git diff --staged --quiet || git commit -m "🖼️ Daily update $(date +%Y-%m-%d)"
+        git push
