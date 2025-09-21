@@ -1,0 +1,26 @@
+name: Daily Image Update
+
+on:
+  schedule:
+    - cron: '0 17 * * *'  # 毎日午前2時JST
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies  
+      run: |
+        pip install gspread google-auth Pillow requests
+    
+    - name: Run update
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+      run: python scripts/daily_update.py
