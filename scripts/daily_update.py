@@ -1,4 +1,3 @@
-
 import os
 import json
 import gspread
@@ -7,21 +6,16 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 import re
 
-# --- ユーザー設定 (ここを編集してください) ---
+# --- ユーザー設定 ---
+OWNER_EMAIL = 'yuuki.yamao07@gmail.com' # ★ ファイル所有者になるGoogleアカウント
+DRIVE_FOLDER_ID = '1-fkwMAiO8ewSXXh6IkMZg2DdnzL39feA' 
 
-# 1. Google Driveに画像をアップロードするためのフォルダを作成し、そのフォルダのIDをここに貼り付けます。
-#    フォルダIDは、URLの `folders/` の後ろにある文字列です。
-#    例: https://drive.google.com/drive/folders/1a2b3c4d5e6f7g8h9i0j
-DRIVE_FOLDER_ID = '1-fkwMAiO8ewSXXh6IkMZg2DdnzL39feA' # ← ここにIDを貼り付け
-
-# 2. スプレッドシートと画像フォルダのパス (通常は変更不要)
+# スプレッドシートと画像フォルダのパス (通常は変更不要)
 SPREADSHEET_ID = '12dYxk29Tj4Xv4E_VDdXnCPclQK72XZrSabdhi2SM_0Y'
 SHEET_NAME = 'master'
 LOCAL_IMAGE_DIR = 'images/_lensimage'
 
-# 3. スプレッドシートの列設定 (通常は変更不要)
-#    `code.gs` の設定と一致させます。
-#    SERIES: I列(9), COLOR: J列(10), IMG: X列(24)
+# スプレッドシートの列設定 (通常は変更不要)
 COL_SERIES = 9
 COL_COLOR = 10
 COL_IMG = 24
@@ -53,17 +47,31 @@ def get_drive_files(service, folder_id):
     print(f"{len(files)}個のファイルが見つかりました。")
     return {f['name']: {'id': f['id'], 'url': f['webViewLink']} for f in files}
 
-def upload_to_drive(service, folder_id, local_path, filename):
-    """ファイルをGoogle Driveにアップロードします。"""
+def upload_to_drive(service, folder_id, local_path, filename, owner_email):
+    """ファイルをGoogle Driveにアップロードし、所有権を譲渡します。"""
     print(f"  > アップロード中: {filename}")
     file_metadata = {'name': filename, 'parents': [folder_id]}
-    media = MediaFileUpload(local_path, mimetype='image/jpeg') # mimetypeは適宜変更
+    media = MediaFileUpload(local_path, mimetype='image/jpeg')
     file = service.files().create(
         body=file_metadata,
         media_body=media,
         fields='id, webViewLink'
     ).execute()
     print(f"  > アップロード完了 (ID: {file.get('id')})")
+
+    print(f"  > 所有権を {owner_email} に譲渡中...")
+    permission_body = {
+        'type': 'user',
+        'role': 'owner',
+        'emailAddress': owner_email
+    }
+    service.permissions().create(
+        fileId=file.get('id'),
+        body=permission_body,
+        transferOwnership=True
+    ).execute()
+    print("  > 所有権の譲渡完了。")
+    
     return {'id': file.get('id'), 'url': file.get('webViewLink')}
 
 def parse_filename(filename):
@@ -78,10 +86,6 @@ def parse_filename(filename):
 def main():
     """メイン処理"""
     print("--- 画像同期スクリプト開始 ---")
-
-    if DRIVE_FOLDER_ID == 'YOUR_GOOGLE_DRIVE_FOLDER_ID':
-        print("エラー: スクリプト内の `DRIVE_FOLDER_ID` を設定してください。")
-        return
 
     try:
         # 認証
@@ -104,19 +108,17 @@ def main():
             
             if filename not in drive_files:
                 local_path = os.path.join(LOCAL_IMAGE_DIR, filename)
-                new_file = upload_to_drive(drive_service, DRIVE_FOLDER_ID, local_path, filename)
+                new_file = upload_to_drive(drive_service, DRIVE_FOLDER_ID, local_path, filename, OWNER_EMAIL)
                 drive_url_map[filename] = new_file['url']
 
         # 4. スプレッドシートを更新
         print("スプレッドシートを更新中...")
         worksheet = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_NAME)
         
-        # ヘッダーを除いて3行目から取得
         records = worksheet.get_all_values()[2:] 
         
         updates = []
         for i, row in enumerate(records):
-            # 行が空、またはSERIES, COLOR列が空ならスキップ
             if not row or (len(row) < COL_COLOR):
                 continue
 
@@ -129,7 +131,6 @@ def main():
             sheet_key = f"{series}｜{color}"
             current_url = row[COL_IMG - 1] if len(row) >= COL_IMG else ''
 
-            # 対応するファイル名を探す
             found_filename = None
             for filename in drive_url_map:
                 if parse_filename(filename) == sheet_key:
@@ -139,7 +140,6 @@ def main():
             if found_filename:
                 new_url = drive_url_map[found_filename]
                 if new_url != current_url:
-                    # gspread.cell.Cell オブジェクトを作成して更新リストに追加
                     cell_to_update = gspread.cell.Cell(row=i + 3, col=COL_IMG, value=new_url)
                     updates.append(cell_to_update)
                     print(f"  - 更新: {sheet_key} (行: {i+3})")
@@ -154,7 +154,6 @@ def main():
 
     except Exception as e:
         print(f"エラーが発生しました: {e}")
-        # エラーで終了した場合、0以外のコードを返す
         exit(1)
 
 if __name__ == '__main__':
