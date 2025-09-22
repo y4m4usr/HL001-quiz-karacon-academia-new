@@ -1,11 +1,12 @@
 /**
  * @OnlyCurrentDoc
  *
- * カラコンクイズアカデミア サーバーサイドメインスクリプト v3.0 (GitHub URLモード)
+ * カラコンクイズアカデミア サーバーサイドメインスクリプト v3.1 (GitHubプロキシモード)
  * 機能：
  * - APIのエントリーポイント (doGet, getQuestions)
  * - スプレッドシートからのデータ読み込み
  * - クイズ問題の生成ロジック
+ * - GitHub上の画像をBase64に変換して返すプロキシ関数
  */
 
 // ===================================================================
@@ -26,11 +27,47 @@ const CONFIG = {
 // Webアプリ エントリーポイント
 // ===================================================================
 function doGet(e) {
-  // HTMLページを表示する
   return HtmlService.createTemplateFromFile('index')
       .evaluate()
       .setTitle('Quiz☆カラコンアカデミア')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// ★ 新設: GitHubのURLから画像をBase64で取得するプロキシ関数
+function getGitHubImageAsBase64(githubUrl) {
+  if (!githubUrl || typeof githubUrl !== 'string' || !githubUrl.startsWith('https://raw.githubusercontent.com')) {
+    return { success: false, error: 'Invalid GitHub URL: ' + githubUrl };
+  }
+
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'github_base64_' + githubUrl;
+  const cached = cache.get(cacheKey);
+
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  try {
+    const response = UrlFetchApp.fetch(githubUrl);
+    const blob = response.getBlob();
+    const base64 = Utilities.base64Encode(blob.getBytes());
+    const mimeType = blob.getContentType();
+    
+    const result = {
+      success: true,
+      data: `data:${mimeType};base64,${base64}`
+    };
+    
+    const jsonResult = JSON.stringify(result);
+    // 6時間キャッシュ
+    cache.put(cacheKey, jsonResult, 21600);
+
+    return result;
+
+  } catch (err) {
+    console.error("GitHub Image proxy error for URL " + githubUrl + ": " + err.toString());
+    return { success: false, error: err.message };
+  }
 }
 
 // ===================================================================
@@ -39,7 +76,6 @@ function doGet(e) {
 function getQuestions(params) {
   try {
     const count = Math.max(1, Math.min(20, (params && params.count) || 10));
-
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     const shM = ss.getSheetByName(CONFIG.MASTER_SHEET_NAME);
     const shC = ss.getSheetByName(CONFIG.CATEGORY_SHEET_NAME);
@@ -112,11 +148,10 @@ function buildQuestion_(correctCand, allCandidates) {
   const options = [correctCand.key, ...distractors];
   shuffle_(options);
   
-  // ★ 変更点: スプレッドシートのURLを直接使う
   return {
     questionId: Utilities.getUuid(),
-    imgL: correctCand.img, // 直接URLを渡す
-    imgR: correctCand.img, // 直接URLを渡す
+    imgL: correctCand.img,
+    imgR: correctCand.img,
     options: options,
     correctAnswer: correctCand.key,
     hint1: correctCand.hint1,
@@ -124,10 +159,5 @@ function buildQuestion_(correctCand, allCandidates) {
   };
 }
 
-function buildCategoryMap_(categoryData){const catMap=new Map();categoryData.forEach(row=>{const series=s_(row[CONFIG.COL_C.SERIES-1]);const color=s_(row[CONFIG.COL_C.COLOR-1]);if(!series||!color)return;const key=`${series}｜${color}`;const cats=new Set(s_(row[CONFIG.COL_C.CATEGORIES-1]).split(/[、,/\]+/));if(catMap.has(key)){const existing=catMap.get(key);cats.forEach(c=>existing.cats.add(c))}else{catMap.set(key,{series,color,cats})}});return catMap}
-function buildCandidates_(masterData,catMap){const candidates=[];masterData.forEach(row=>{const series=s_(row[CONFIG.COL_M.SERIES-1]);const color=s_(row[CONFIG.COL_M.COLOR-1]);const img=s_(row[CONFIG.COL_M.IMG-1]);if(!series||!color||!img)return;const key=`${series}｜${color}`;if(!catMap.has(key))return;candidates.push({key:key,series:series,color:color,img:img,cats:catMap.get(key).cats,hint1:`DIA:${s_(row[CONFIG.COL_M.DIA-1])} / G.DIA:${s_(row[CONFIG.COL_M.GDIA-1])} / BC:${s_(row[CONFIG.COL_M.BC-1])}`,hint2:s_(row[CONFIG.COL_M.COMMENT-1])})});return candidates}
-function s_(v){return(v===null||v===undefined)?'':String(v).trim()}
-function shuffle_(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}
-function colorSim_(a,b){const na=normColor_(a),nb=normColor_(b);if(!na||!nb)return 0;const famA=CONFIG.COLOR_TOKENS.filter(t=>na.includes(t));const famB=CONFIG.COLOR_TOKENS.filter(t=>nb.includes(t));if(famA.length&&famB.length&&!famA.some(x=>famB.includes(x)))return 0;const bigramsA=new Set(getBigrams_(na));const bigramsB=new Set(getBigrams_(nb));if(!bigramsA.size||!bigramsB.size)return 0;let inter=0;bigramsA.forEach(g=>{if(bigramsB.has(g))inter++});const union=bigramsA.size+bigramsB.size-inter;return union?inter/union:0}
-function normColor_(s){return s_(''+s).replace(/[()[\]{}!！?？・･\-\s＿_－—〜~､、，,．.\.／/\]/g,'').toLowerCase()}
-function getBigrams_(s){const grams=[];for(let i=0;i<s.length-1;i++)grams.push(s.slice(i,i+2));return grams}
+function buildCategoryMap_(categoryData){const catMap=new Map();categoryData.forEach(row=>{const series=s_(row[CONFIG.COL_C.SERIES-1]);const color=s_(row[CONFIG.COL_C.COLOR-1]);if(!series||!color)return;const key=`${series}｜${color}`;const cats=new Set(s_(row[CONFIG.COL_C.CATEGORIES-1]).split(/[、,/
+	\]+/));if(catMap.has(key)){const existing=catMap.get(key);cats.forEach(c=>existing.cats.add(c))}else{catMap.set(key,{series,color,cats})}});return catMap}function buildCandidates_(masterData,catMap){const candidates=[];masterData.forEach(row=>{const series=s_(row[CONFIG.COL_M.SERIES-1]);const color=s_(row[CONFIG.COL_M.COLOR-1]);const img=s_(row[CONFIG.COL_M.IMG-1]);if(!series||!color||!img)return;const key=`${series}｜${color}`;if(!catMap.has(key))return;candidates.push({key:key,series:series,color:color,img:img,cats:catMap.get(key).cats,hint1:`DIA:${s_(row[CONFIG.COL_M.DIA-1])} / G.DIA:${s_(row[CONFIG.COL_M.GDIA-1])} / BC:${s_(row[CONFIG.COL_M.BC-1])}`,hint2:s_(row[CONFIG.COL_M.COMMENT-1])})});return candidates}function s_(v){return(v===null||v===undefined)?'':String(v).trim()}function shuffle_(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}function colorSim_(a,b){const na=normColor_(a),nb=normColor_(b);if(!na||!nb)return 0;const famA=CONFIG.COLOR_TOKENS.filter(t=>na.includes(t));const famB=CONFIG.COLOR_TOKENS.filter(t=>nb.includes(t));if(famA.length&&famB.length&&!famA.some(x=>famB.includes(x)))return 0;const bigramsA=new Set(getBigrams_(na));const bigramsB=new Set(getBigrams_(nb));if(!bigramsA.size||!bigramsB.size)return 0;let inter=0;bigramsA.forEach(g=>{if(bigramsB.has(g))inter++});const union=bigramsA.size+bigramsB.size-inter;return union?inter/union:0}function normColor_(s){return s_(''+s).replace(/[()[\]{}!！?？・･\-\s＿_－—〜~､、，,．.\.／/\\]/g,'').toLowerCase()}function getBigrams_(s){const grams=[];for(let i=0;i<s.length-1;i++)grams.push(s.slice(i,i+2));return grams}
