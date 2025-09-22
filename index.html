@@ -81,7 +81,7 @@
             <div class="logo">👁️</div>
             <div class="hero-text">
                 <h1>Quiz☆カラコンアカデミア</h1>
-                <div class="api">ホテラバ presents v2.4</div>
+                <div class="api">ホテラバ presents v3.0</div>
             </div>
         </div>
 
@@ -156,8 +156,8 @@
                 <div class="lens-container">
                     <div class="lens-label">このカラコンは何？</div>
                     <div class="lens-display">
-                        <img class="lens-image" id="leftLens" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E" alt="左レンズ">
-                        <img class="lens-image" id="rightLens" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E" alt="右レンズ">
+                        <img class="lens-image" id="leftLens" src="" alt="左レンズ">
+                        <img class="lens-image" id="rightLens" src="" alt="右レンズ">
                     </div>
                 </div>
                 <div class="hint-buttons">
@@ -250,34 +250,24 @@ const App = (() => {
         if(page) page.classList.remove('hidden');
     }
 
-    // ★ 新設: Base64画像プロキシ経由で画像を設定する関数
-    async function fetchAndSetImage(imgElement, proxyUrl) {
-        // まずプレースホルダーを表示
+    // ★ 変更: 画像URLを直接セットするシンプルな関数
+    function setImage(imgElement, imageUrl) {
         const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E";
+        const errorPlaceholder = placeholder.replace('Loading...', 'Error');
+
         imgElement.src = placeholder;
-        
-        if (!proxyUrl) {
-            console.error('Proxy URL is null');
-            imgElement.src = placeholder.replace('Loading...', 'Error');
+
+        if (!imageUrl) {
+            console.error('Image URL is null or empty.');
+            imgElement.src = errorPlaceholder;
             return;
         }
-
-        try {
-            // fetchを使ってGASのdoGetを叩く
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error('Network response was not ok');
-            
-            const result = await response.json();
-            
-            if (result.success && result.data) {
-                imgElement.src = result.data; // Base64データをセット
-            } else {
-                throw new Error(result.error || 'Failed to get image data');
-            }
-        } catch (error) {
-            console.error('Failed to fetch image:', error);
-            imgElement.src = placeholder.replace('Loading...', 'Error');
-        }
+        
+        imgElement.src = imageUrl;
+        imgElement.onerror = () => {
+            console.error('Failed to load image:', imageUrl);
+            imgElement.src = errorPlaceholder;
+        };
     }
 
     // クイズ開始
@@ -320,9 +310,9 @@ const App = (() => {
         UI.progressFill.style.width = `${(state.currentQuestionIndex + 1) * 10}%`;
         state.selectedAnswer = null; // 選択をリセット
 
-        // ★ 修正: fetchAndSetImageを呼び出すように変更
-        fetchAndSetImage(UI.leftLens, q.imgL);
-        fetchAndSetImage(UI.rightLens, q.imgR);
+        // ★ 修正: 新しいsetImage関数を呼び出す
+        setImage(UI.leftLens, q.imgL);
+        setImage(UI.rightLens, q.imgR);
 
         UI.answerOptions.innerHTML = '';
         q.options.forEach(opt => {
@@ -362,7 +352,6 @@ const App = (() => {
         const q = state.questions[state.currentQuestionIndex];
         const isCorrect = state.selectedAnswer === q.correctAnswer;
         
-        // 回答履歴を保存
         state.answers.push({
             selected: state.selectedAnswer,
             correct: q.correctAnswer,
@@ -448,4 +437,3 @@ document.addEventListener('DOMContentLoaded', App.init);
 </script>
 </body>
 </html>
-gitあっd。
