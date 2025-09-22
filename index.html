@@ -81,7 +81,7 @@
             <div class="logo">👁️</div>
             <div class="hero-text">
                 <h1>Quiz☆カラコンアカデミア</h1>
-                <div class="api">ホテラバ presents v3.0</div>
+                <div class="api">ホテラバ presents v3.1</div>
             </div>
         </div>
 
@@ -250,24 +250,33 @@ const App = (() => {
         if(page) page.classList.remove('hidden');
     }
 
-    // ★ 変更: 画像URLを直接セットするシンプルな関数
-    function setImage(imgElement, imageUrl) {
+    // ★ 変更: GitHubプロキシ経由で画像を設定する関数
+    function setImageWithProxy(imgElement, githubUrl) {
         const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E";
         const errorPlaceholder = placeholder.replace('Loading...', 'Error');
 
         imgElement.src = placeholder;
 
-        if (!imageUrl) {
+        if (!githubUrl) {
             console.error('Image URL is null or empty.');
             imgElement.src = errorPlaceholder;
             return;
         }
-        
-        imgElement.src = imageUrl;
-        imgElement.onerror = () => {
-            console.error('Failed to load image:', imageUrl);
-            imgElement.src = errorPlaceholder;
-        };
+
+        google.script.run
+            .withSuccessHandler(result => {
+                if (result && result.success) {
+                    imgElement.src = result.data;
+                } else {
+                    console.error('Proxy failed:', result ? result.error : 'Unknown error');
+                    imgElement.src = errorPlaceholder;
+                }
+            })
+            .withFailureHandler(error => {
+                console.error('Proxy call failed:', error);
+                imgElement.src = errorPlaceholder;
+            })
+            .getGitHubImageAsBase64(githubUrl);
     }
 
     // クイズ開始
@@ -310,9 +319,9 @@ const App = (() => {
         UI.progressFill.style.width = `${(state.currentQuestionIndex + 1) * 10}%`;
         state.selectedAnswer = null; // 選択をリセット
 
-        // ★ 修正: 新しいsetImage関数を呼び出す
-        setImage(UI.leftLens, q.imgL);
-        setImage(UI.rightLens, q.imgR);
+        // ★ 修正: プロキシ経由で画像を設定する
+        setImageWithProxy(UI.leftLens, q.imgL);
+        setImageWithProxy(UI.rightLens, q.imgR);
 
         UI.answerOptions.innerHTML = '';
         q.options.forEach(opt => {

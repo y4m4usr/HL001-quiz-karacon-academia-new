@@ -1,3 +1,4 @@
+
 {
   "timeZone": "Asia/Tokyo",
   "dependencies": {},
@@ -12,5 +13,8 @@
   "webapp": {
     "executeAs": "USER_DEPLOYING",
     "access": "ANYONE_ANONYMOUS"
-  }
+  },
+  "urlFetchWhitelist": [
+    "https://raw.githubusercontent.com/"
+  ]
 }
