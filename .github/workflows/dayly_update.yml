@@ -18,7 +18,7 @@ jobs:
     
     - name: Install dependencies  
       run: |
-        pip install gspread google-auth Pillow requests
+        pip install -r requirements.txt
     
     - name: Run update
       env:
