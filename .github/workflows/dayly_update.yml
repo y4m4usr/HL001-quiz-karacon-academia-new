@@ -16,11 +16,11 @@ jobs:
       with:
         python-version: '3.9'
     
-    - name: Install dependencies  
+    - name: Install dependencies
       run: |
-        pip install -r requirements.txt
+        pip install gspread google-api-python-client google-auth-httplib2 google-auth-oauthlib
     
-    - name: Run update
+    - name: Run image download script
       env:
         GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
       run: python scripts/daily_update.py

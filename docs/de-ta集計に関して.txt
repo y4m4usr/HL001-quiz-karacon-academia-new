@@ -1,0 +1,292 @@
+e-
+# 🔧 依頼: HL001（カラコンクイズ）に v1.7 変更を実装して
+
+あなたは熟練のフルスタックエンジニアです。以下の 4 点を **Google Apps Script（GAS）＋既存フロント**に実装し、テストまで完了してください。
+
+## 変更要約（実装対象）
+
+1. **QUIZ\_HISTORY に列追加**
+   `elapsedSec`（0–200秒）／`timeBonusPt`（0–200pt）／`totalPoints`（0–300pt）を確定列として追加・保存。
+
+* 仕様根拠：最終正答率は **生正答率 − (ヒント×3%) − (タイムアウト×10%)** を維持（下限0%）。
+* タイムボーナスは 10問=200sec の **残秒数をそのままポイント**として加点（0–200）。
+* 参考指標 `totalPoints = ROUND(finalAccuracy) + timeBonusPt`（最大300）も記録。
+
+2. **出題ロジックに canonicalKey を導入**
+   「**ブランド名カナ＋カラー名カナ**」の正規化キーで同一判定し、**装用期間が異なるだけのカラコンも同一**とみなす。1問内の選択肢は **canonicalKey 重複禁止**。
+
+* 仕様根拠：同一商品判定は *ブランド名カナ + カラー名カナ*（v1.5）を拡張、装用期間差は同一扱い。
+
+3. **ランキング集計の拡張**
+   期間に **累計（ALL）** を追加。集計軸に **総合（合計）／平均** トグルを追加。
+
+* 公式順位は引き続き **最終正答率** ベース（同率時は `sumTimeBonus` → `avgTime`）。
+* 参考として `sumTotalPoints` による並び替えも可能にする。
+
+4. **ダッシュボード UI の拡張（Noto Sans JP 適用）**
+   ランキングタブ：**Day / Week / Month / 累計** を実装。指標トグル：**総合 / 平均**。既存の **店舗／勤務形態／権限** フィルタは維持。UIトーンは現行デモに準拠し、**フォントは Noto Sans JP** を明示的に読み込み・適用すること。 &#x20;
+
+---
+
+## リポジトリ前提（v1.5 構成に準拠）
+
+```
+/gas
+  ├── Config.gs
+  ├── DataAccess.gs
+  ├── QuizLogic.gs
+  ├── AuthRank.gs
+  ├── RankingsSnapshot.gs   # ← なければ新規作成
+  └── Migrations.gs         # ← 新規作成（列追加）
+/public
+  ├── index.html            # Apps Script HTML Service を利用している場合は *.html
+  └── styles.css
+/docs
+  └── 要件定義・ワイヤー 等
+```
+
+---
+
+## 実装詳細
+
+### 1) データ定義・マイグレーション
+
+**Config.gs** に列定義を追記（なければ作成）：
+
+```js
+const CFG = (this.CFG || {});
+CFG.COLS = CFG.COLS || {};
+CFG.COLS.HISTORY = Object.assign({}, CFG.COLS.HISTORY, {
+  USER_ID: 'userId',
+  STARTED_AT: 'startedAt',
+  ENDED_AT: 'endedAt',
+  BASE_ACC: 'baseAccuracy',        // 生正答率（%）
+  FINAL_ACC: 'finalAccuracy',      // 最終正答率（%）
+  HINTS: 'hintsTotal',
+  TIMEOUTS: 'timeoutsTotal',
+  // ★ v1.6 追加
+  ELAPSED_SEC: 'elapsedSec',       // 0..200
+  TIME_BONUS_PT: 'timeBonusPt',    // 0..200
+  TOTAL_POINTS: 'totalPoints'      // 0..300（参考）
+});
+```
+
+**Migrations.gs**（新規）：ヘッダー行を検査し、欠けていれば **末尾に列を追加**、全履歴に初期値を充当。
+
+```js
+function migrate_add_v16_history_columns() {
+  const sh = getHistorySheet_(); // 実装は DataAccess.gs のユーティリティを利用
+  const header = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0];
+  const need = ['finalAccuracy','elapsedSec','timeBonusPt','totalPoints'];
+  const miss = need.filter(n => !header.includes(n));
+  if (miss.length) {
+    sh.insertColumnsAfter(sh.getLastColumn(), miss.length);
+    sh.getRange(1, sh.getLastColumn()-miss.length+1, 1, miss.length).setValues([miss]);
+  }
+  // 既存行の欠損は 0 埋め or 再計算（finalAccuracy は可能なら再計算）
+}
+```
+
+### 2) 記録時のメトリクス確定（最終正答率＋タイムボーナス）
+
+**Contracts/Logic（適切な層）** にユーティリティを追加：
+
+```js
+function computeFinalAccuracy_(base, hints, timeouts) {
+  return Math.max(0, base - 3*hints - 10*timeouts); // v1.5 仕様準拠（下限0） :contentReference[oaicite:9]{index=9}
+}
+function clamp_(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+function computeTimeBonus_(elapsedSec) {
+  // 10問=200秒、残秒がそのままボーナス
+  const e = clamp_(Math.round(elapsedSec), 0, 200);
+  return 200 - e; // 0..200
+}
+function computeTotalPoints_(finalAcc, timeBonusPt) {
+  return Math.round(finalAcc) + timeBonusPt; // 0..300（参考）
+}
+```
+
+**記録処理**（例：`AuthRank.gs` の保存関数）で新列を確定保持：
+
+```js
+function saveSession_(rec) {
+  // rec: { startedAt, endedAt, baseAccuracy, hintsTotal, timeoutsTotal, elapsedSec? }
+  const elapsed = rec.elapsedSec ?? clamp_(Math.floor((rec.endedAt - rec.startedAt)/1000), 0, 200);
+  const finalAcc = computeFinalAccuracy_(rec.baseAccuracy, rec.hintsTotal, rec.timeoutsTotal);
+  const timeBonus = computeTimeBonus_(elapsed);
+  const totalPts = computeTotalPoints_(finalAcc, timeBonus);
+  // ...ヘッダー順に合わせて行を構築して appendRow
+}
+```
+
+### 3) 出題の重複禁止（装用期間差を同一扱い）
+
+**QuizLogic.gs** に正規化関数と canonicalKey を追加：
+
+```js
+function normalizeKana_(s) {
+  if (!s) return '';
+  return s.toString()
+    .trim()
+    .replace(/[ーｰ—‐\-]/g, 'ー')     // 長音・ダッシュ統一
+    .replace(/[・･\s]+/g, '')        // 中点・空白除去
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .toLowerCase();
+}
+function canonicalKey_(brandKana, colorKana) {
+  return normalizeKana_(brandKana) + '|' + normalizeKana_(colorKana);
+  // ※装用期間はキーに含めない＝期間違いも同一カラコン扱い（v1.6） :contentReference[oaicite:10]{index=10}
+}
+```
+
+**選択肢生成**で 4 択内の canonicalKey 重複を禁止：
+
+```js
+function buildQuestion_(correct, distractorPool) {
+  const used = new Set([canonicalKey_(correct.brandKana, correct.colorKana)]);
+  const opts = [correct];
+  for (const cand of shuffle_(distractorPool)) {
+    const key = canonicalKey_(cand.brandKana, cand.colorKana);
+    if (!used.has(key)) { opts.push(cand); used.add(key); }
+    if (opts.length === 4) break;
+  }
+  if (opts.length < 4) return null; // 不足時は再抽選
+  return shuffle_(opts);
+}
+```
+
+> 参照：同一商品判定は「ブランド名カナ＋カラー名カナ」。装用期間差も同一扱い／1問内重複禁止。
+
+### 4) ランキング集計（Day/Week/Month/All × 合計/平均）
+
+**RankingsSnapshot.gs**（新規）：
+
+```js
+function rebuildSnapshots_v16() {
+  const hist = readHistory_(); // 直近90日＋累計
+  const rows = hist.map(h => ({
+    userId: h.userId,
+    store: h.store, role: h.role, emp: h.employmentType,
+    day: Utilities.formatDate(h.endedAt, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+    week: getIsoWeekKey_(h.endedAt),    // 例: 2025-39
+    month: Utilities.formatDate(h.endedAt, Session.getScriptTimeZone(), 'yyyy-MM'),
+    final: h.finalAccuracy,
+    time: h.elapsedSec,
+    tBonus: h.timeBonusPt,
+    tPoints: h.totalPoints
+  }));
+  writeAgg_('day',   aggregate_(rows, r => r.day));
+  writeAgg_('week',  aggregate_(rows, r => r.week));
+  writeAgg_('month', aggregate_(rows, r => r.month));
+  writeAgg_('all',   aggregate_(rows, _ => 'ALL'));  // ★累計
+}
+function aggregate_(rows, keyFn){
+  const map = {};
+  for (const r of rows) {
+    const key = JSON.stringify([keyFn(r), r.userId, r.store, r.role, r.emp]);
+    (map[key] ||= { plays:0, sumFinal:0, maxFinal:0, sumTime:0, sumTBonus:0, sumTPoints:0, period: keyFn(r), userId:r.userId, store:r.store, role:r.role, emp:r.emp });
+    const m = map[key];
+    m.plays++; m.sumFinal += r.final; m.maxFinal = Math.max(m.maxFinal, r.final);
+    m.sumTime += r.time; m.sumTBonus += r.tBonus; m.sumTPoints += r.tPoints;
+  }
+  return Object.values(map).map(m => ({
+    periodKey: m.period,
+    userId: m.userId, store:m.store, role:m.role, emp:m.emp,
+    plays: m.plays,
+    avgFinalAcc: m.sumFinal / m.plays,
+    maxFinalAcc: m.maxFinal,
+    sumFinalAcc: m.sumFinal,
+    avgTime: m.sumTime / m.plays,
+    sumTimeBonus: m.sumTBonus,
+    sumTotalPoints: m.sumTPoints
+  }));
+}
+```
+
+**並び替え規則（公式/参考）**：
+
+* 公式：`avgFinalAcc DESC, sumTimeBonus DESC, avgTime ASC, updatedAt DESC`
+* 参考：`sumTotalPoints DESC, avgFinalAcc DESC, avgTime ASC`
+
+### 5) ダッシュボード UI（Day/Week/Month/累計 ＋ 合計/平均、Noto Sans JP）
+
+既存デモのランキング UI を踏襲し、タブに **累計** を追加、トグルに **合計/平均** を追加。フォントは **Noto Sans JP** を読み込み・適用。
+
+**HTML（例：index.html or GAS HTML Service）** の `<head>` にフォントを追加：
+
+```html
+<style>
+@font-face{
+  font-family: 'Noto Sans JP';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/NotoSansJP-VariableFont_wght.woff2') format('woff2');
+}
+:root { --font: 'Noto Sans JP', system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; }
+body { font-family: var(--font); }
+</style>
+```
+
+> ※ `/public/fonts` に Noto Sans JP（可変 or WOFF2）を配置。既存 UI の配色・レイアウトはデモ準拠。&#x20;
+
+**ランキングのタブ＆トグル（抜粋）**：
+
+```html
+<div class="ranking-tabs">
+  <button data-period="daily"  class="tab active">デイリー</button>
+  <button data-period="weekly" class="tab">ウィークリー</button>
+  <button data-period="monthly" class="tab">マンスリー</button>
+  <button data-period="all"    class="tab">累計</button> <!-- ★追加 -->
+</div>
+<div class="metric-toggle">
+  <label><input type="radio" name="agg" value="sum" checked> 合計</label>
+  <label><input type="radio" name="agg" value="avg"> 平均</label>
+</div>
+```
+
+**JS（ランキング再描画）**：
+
+```js
+let state = { period: 'daily', agg: 'sum', sort: 'official' }; // sort: official|points
+function refreshRanking(){
+  const rows = fetchSnapshot_(state.period); // GAS or API で snapshot_* を取得
+  const metric = state.agg === 'sum' ? 'sumFinalAcc' : 'avgFinalAcc';
+  const sorted = (state.sort === 'official')
+    ? rows.sort((a,b)=> b[metric]-a[metric] || b.sumTimeBonus-a.sumTimeBonus || a.avgTime-b.avgTime)
+    : rows.sort((a,b)=> b.sumTotalPoints-a.sumTotalPoints || b[metric]-a[metric] || a.avgTime-b.avgTime);
+  renderRankingList(sorted);
+}
+```
+
+---
+
+## テスト観点
+
+* **列追加**：`finalAccuracy / elapsedSec / timeBonusPt / totalPoints` が新規セッション保存時に必ず埋まる。既存行は 0 または再計算で補填。
+* **境界値**：`elapsedSec=0→timeBonusPt=200`、`elapsedSec=200→0`、`finalAccuracy` が負にならない（0%下止め）。
+* **重複禁止**：同一ブランド名カナ×カラー名カナの装用期間違いが、1問内に重複しない。
+* **ランキング**：`period=all` が選べ、**合計/平均** トグルで表示が切り替わる。公式ソートと参考（totalPoints）ソートが動作。
+* **UI/フォント**：全体で **Noto Sans JP** が適用され、既存デモのトーンを維持。
+
+---
+
+## 追加メモ
+
+* 仕様の大枠（-3%、-10%、データ完備出題、UIフォント）は v1.5・ワイヤー・デモに準拠してください。 &#x20;
+* 実装は「AI主導の一貫開発」方針で、設定値は **Config** に集約、集計は夜間スナップショット更新（時間主導トリガ）としてください。
+
+---
+
+## 期待する納品物
+
+1. 変更済み `*.gs` 一式（`Migrations.gs` / `RankingsSnapshot.gs` 追加を含む）
+2. フロント更新（タブ＆トグル、フォント読込）
+3. 単体テスト用スクリプト or 手順メモ（上記テスト観点を満たすこと）
+4. 実行手順：
+
+   * `migrate_add_v16_history_columns()` 実行
+   * 履歴書き込み → スナップショット `rebuildSnapshots_v16()` 実行
+   * UIで Day/Week/Month/累計 × 合計/平均 を確認
+
+以上。

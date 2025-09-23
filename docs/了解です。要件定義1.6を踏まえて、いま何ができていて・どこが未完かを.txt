@@ -1,0 +1,567 @@
+了解です。**要件定義1.6**を踏まえて、いま何ができていて・どこが未完かをまず超短くまとめ、その上で **「最短でレンズ画像を問題に載せる」即効パッチ** と、**本番運用向け（GAS＋スプシ連携）** の実装案、さらに **ランキング** と **マイ成績**（統計/グラフ＋Noto Sans JP）まで、まとめてコード提案します。
+※本文中の根拠は要件書と現状デモHTMLに紐づけています。&#x20;
+
+---
+
+## 現状の整理（要点だけ）
+
+* クイズUI/UX（ログイン→ホーム→クイズ→結果）は完成済。クイズは **10問固定 / 20秒 / 4択 / ヒント・スコア表示** まで動作。**ただしレンズはCSSの疑似パターンで実画像未表示**。
+* データは **Google Spreadsheet** で管理。**X列(24) が画像URL**, **I列(9)=ブランド / J列(10)=カラー** が定義済。画像は左右2枚並列表示の設計。
+* 画像は GitHub の `images/` に日次自動更新（差分＆分割コミット）まで設計済（Colab管理ツール v4.0）。CDN不要でGitHub直配信想定。
+* **未実装**：① 実画像の表示連携（GAS/スプシ→フロント） ② **ランキング** ③ **マイ成績（個人成績ダッシュボード）**。
+
+---
+
+# A. 最短で「レンズ画像を表示」する即効パッチ（5分）
+
+> まずは**今のデモHTMLだけ**を直し、ダミーCSSパターンの代わりに**実画像**を置けるようにします。GAS連携は後段Bで入れます。
+
+### 1) CSSの下準備（背景画像前提の見栄えに調整）
+
+```css
+/* 既存 .lens-image に追記/上書き */
+.lens-image {
+  width: 100px; height: 100px; border-radius: 50%;
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15); overflow: hidden; position: relative;
+}
+/* 画像のハイライト反射はそのまま維持 */
+.lens-image::after { /* 既存通り */ }
+```
+
+### 2) 画像適用ユーティリティ（エラーフォールバック含む）
+
+```html
+<script>
+  // GitHub直配信用のフォールバック（raw -> jsDelivr）
+  function withFallback(urls, onload, onerror) {
+    const img = new Image();
+    let idx = 0;
+    function tryLoad() {
+      img.src = urls[idx];
+      img.onload = () => onload(urls[idx]);
+      img.onerror = () => {
+        idx++;
+        if (idx < urls.length) tryLoad();
+        else onerror && onerror();
+      };
+    }
+    tryLoad();
+  }
+
+  function applyLensImages(leftEl, rightEl, src) {
+    // src が1枚なら左右同一表示。2枚あるなら配列で渡す
+    const leftSrcs = Array.isArray(src) ? [src[0]] : [src];
+    const rightSrcs = Array.isArray(src) ? [src[1] || src[0]] : [src];
+
+    // GitHub raw と jsDelivr を自動フォールバック
+    const gh = (s) => s;
+    const cdn = (s) => s.replace('https://raw.githubusercontent.com/', 'https://cdn.jsdelivr.net/gh/').replace('/main/', '@main/');
+    const tryUrls = (s) => [gh(s), cdn(s)];
+
+    withFallback(tryUrls(leftSrcs[0]), (ok) => {
+      leftEl.style.backgroundImage = `url("${ok}")`;
+    }, () => { leftEl.className = 'lens-image lens-pattern-1'; }); // 失敗時は既存パターンへ
+
+    withFallback(tryUrls(rightSrcs[0]), (ok) => {
+      rightEl.style.backgroundImage = `url("${ok}")`;
+    }, () => { rightEl.className = 'lens-image lens-pattern-1'; });
+  }
+</script>
+```
+
+### 3) 出題データに画像URLフィールドを仮追加（後でGAS差し替え）
+
+```html
+<script>
+  // 例：GitHub images にある実ファイルへ差し替え（日本語名は encodeURI 必須）
+  // 命名規則は「品番_ブランド_カラー_装用期間_lens.jpg/samune.jpg」を推奨（要件追記）:contentReference[oaicite:7]{index=7}
+  const IMAGE_BASE = "https://raw.githubusercontent.com/y4m4usr/HL001-quiz-karacon-academia-new/main/images/";
+
+  // 例: スプシX列(24)にフルURLが入るなら、そのまま使ってOK（後段Bで自動取得）:contentReference[oaicite:8]{index=8}
+  function buildImageURL(file) { return IMAGE_BASE + encodeURI(file); }
+
+  // 既存 colorContacts に image フィールドを追加（当面の手置き）
+  const colorContacts = [
+    {
+      id: 1, brand: 'ダスティティー', color: '玉虫ブラウン', /* 既存項目… */
+      image: buildImageURL("AN001234_ダスティティー_玉虫ブラウン_1day_lens.jpg")
+      // 2枚ある場合: image: [buildImageURL("..._lens.jpg"), buildImageURL("..._samune.jpg")]
+    },
+    // …他も同様
+  ];
+</script>
+```
+
+### 4) 問題読込時に画像を適用（既存 loadQuestion を差し替え）
+
+```html
+<script>
+  // 既存 loadQuestion() の「レンズパターン設定」部分を置換
+  function loadQuestion() {
+    /* 既存の状態初期化はそのまま */
+    quizState.currentQuestion++;
+    quizState.selectedAnswer = null;
+    quizState.hintsUsed = 0;
+    quizState.timeLeft = 20;
+    document.getElementById('currentQuestion').textContent = quizState.currentQuestion;
+    document.getElementById('quizProgress').style.width =
+      `${(quizState.currentQuestion / quizState.totalQuestions) * 100}%`;
+    // …ヒント/ボタンの初期化も既存通り…
+
+    // ランダム出題
+    const randomIndex = Math.floor(Math.random() * colorContacts.length);
+    currentCorrectAnswer = colorContacts[randomIndex];
+
+    const leftEl  = document.getElementById('leftLens');
+    const rightEl = document.getElementById('rightLens');
+
+    if (currentCorrectAnswer.image) {
+      applyLensImages(leftEl, rightEl, currentCorrectAnswer.image);
+    } else {
+      // 画像未設定なら従来パターン
+      leftEl.className  = 'lens-image ' + (currentCorrectAnswer.pattern || 'lens-pattern-1');
+      rightEl.className = 'lens-image ' + (currentCorrectAnswer.pattern || 'lens-pattern-1');
+    }
+
+    // 選択肢生成～タイマー開始は既存通り
+    const options = generateOptions(currentCorrectAnswer);
+    displayOptions(options);
+    startTimer();
+  }
+</script>
+```
+
+> これで **実画像が表示** されます。画像URLが落ちても **自動でCSSパターンにフォールバック** します。GitHub raw でレート制限やCORSが出る場合は自動で **jsDelivr** にフェイルオーバーします。要件上、GitHub直配でOKなので方針整合です。
+
+---
+
+# B. 本番運用：GAS＋スプシ連携で画像＆出題を配信
+
+> Aの即効パッチは「手置きURL」。ここから **要件通り** に **スプシX列(24)=画像URL** を配り、**GAS Web API** でフロントへ供給します。
+
+## B-1) `gas/Config.gs`（列定義・ID）
+
+※要件のIDと列定義を参照。
+
+```js
+// gas/Config.gs
+var CONFIG = {
+  MASTER_BOOK_ID: '1EkTjV__k1vAl08PlbOUhYpbFEGC-F_LL_26o1-HT1AI',
+  RANKINGS_BOOK_ID: '1I2REcy2v5OpyzoY3k61kCzJ3SYKOBBCMxTLCeHWutT8',
+  QUIZ_HISTORY_BOOK_ID: '1ShWXLvY9RimRYfsAkwoRyM2Bfwj4a3zVmr5bQc33-o0',
+
+  // 列（1始まり）
+  IMAGE_URL_COL: 24, // X列（画像URL）
+  BRAND_COL: 9,      // I列
+  COLOR_COL: 10,     // J列
+  USAGE_PERIOD_COL: 11, // K列（命名規則に必須）
+  MASTER_SHEET_NAME: 'master',      // 実名に合わせて
+  HISTORY_SHEET_NAME: 'quiz_history'// 要件どおり
+};
+```
+
+## B-2) `gas/DataAccess.gs`（出題API）
+
+```js
+// gas/DataAccess.gs
+function getMasterSheet_() {
+  return SpreadsheetApp.openById(CONFIG.MASTER_BOOK_ID).getSheetByName(CONFIG.MASTER_SHEET_NAME);
+}
+
+function pickRandom_(arr, n) {
+  const a = arr.slice(); a.sort(() => Math.random() - 0.5);
+  return a.slice(0, n);
+}
+
+function buildItem_(row) {
+  // 必要に応じて列を調整
+  var brand = row[CONFIG.BRAND_COL - 1];
+  var color = row[CONFIG.COLOR_COL - 1];
+  var imageUrl = row[CONFIG.IMAGE_URL_COL - 1]; // X列: フルURL推奨
+
+  return {
+    brand: brand,
+    color: color,
+    // 左右2枚あれば "URL1|URL2" などの書式も許容
+    images: imageUrl && imageUrl.indexOf('|') > -1
+      ? imageUrl.split('|').map(function(s){return s.trim();})
+      : (imageUrl ? [imageUrl] : []),
+    // 任意: ヒント・スペックも列から取り出して拡張可
+  };
+}
+
+function getQuizItems_(limit) {
+  var sh = getMasterSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+
+  var values = sh.getRange(2, 1, last-2+1, sh.getLastColumn()).getValues();
+  var items = values.map(buildItem_).filter(function(it){ return it.brand && it.color; });
+  return pickRandom_(items, limit || 10);
+}
+
+// --- Web API ---
+function doGet(e) {
+  var action = (e && e.parameter && e.parameter.action) || 'items';
+  var output;
+
+  if (action === 'items') {
+    output = { items: getQuizItems_(10) };
+  } else if (action === 'ranking') {
+    var scope = (e.parameter && e.parameter.scope) || 'daily';
+    output = { ranking: getRanking_(scope) };
+  } else if (action === 'mystats') {
+    var user = (e.parameter && e.parameter.user) || '';
+    output = getMyStats_(user);
+  } else {
+    output = { message: 'unknown action' };
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(output))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+```
+
+## B-3) `gas/AuthRank.gs`（成績保存＋ランキング算出）
+
+```js
+// gas/AuthRank.gs
+function historySheet_() {
+  return SpreadsheetApp.openById(CONFIG.QUIZ_HISTORY_BOOK_ID).getSheetByName(CONFIG.HISTORY_SHEET_NAME);
+}
+
+// 成績保存: POST /?action=submit
+function doPost(e) {
+  var params = JSON.parse(e.postData.contents || '{}');
+  if (params.action === 'submit') {
+    saveResult_(params);
+    return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'unknown' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function saveResult_(r) {
+  // r = { user, store, score, correct, total, accuracy, timeSec, hints, dateISO }
+  var sh = historySheet_();
+  sh.appendRow([
+    new Date(r.dateISO || new Date().toISOString()),
+    r.user || '',
+    r.store || '',
+    r.score || 0,
+    r.correct || 0,
+    r.total || 10,
+    r.accuracy || 0,
+    r.timeSec || 0,
+    r.hints || 0
+  ]);
+}
+
+// ランキング集計
+function getRanking_(scope) {
+  var sh = historySheet_();
+  var vals = sh.getDataRange().getValues();
+  // ヘッダ仮定: [timestamp, user, store, score, correct, total, accuracy, timeSec, hints]
+  var now = new Date();
+  var from = new Date(now);
+  if (scope === 'daily') from.setHours(0,0,0,0);
+  if (scope === 'weekly') from.setDate(now.getDate() - 7);
+  if (scope === 'monthly') from.setMonth(now.getMonth() - 1);
+
+  var map = {};
+  for (var i = 1; i < vals.length; i++) {
+    var row = vals[i]; var ts = new Date(row[0]);
+    if (ts < from) continue;
+    var user = row[1] || 'unknown';
+    var score = Number(row[3] || 0);
+    var acc = Number(row[6] || 0);
+
+    if (!map[user]) map[user] = { user: user, points: 0, counts: 0, accSum: 0, store: row[2] || '' };
+    map[user].points += score;
+    map[user].counts += 1;
+    map[user].accSum += acc;
+  }
+
+  var arr = Object.keys(map).map(function(k){
+    var o = map[k]; o.accRate = o.counts ? Math.round(o.accSum / o.counts) : 0; return o;
+  });
+  arr.sort(function(a,b){ return b.points - a.points; });
+  return arr.slice(0, 50);
+}
+
+// マイ成績
+function getMyStats_(user) {
+  if (!user) return { error: 'no user' };
+  var sh = historySheet_();
+  var vals = sh.getDataRange().getValues();
+  var recents = [];
+  var all = { total:0, correct:0, played:0, points:0, timeSum:0, streak:0 };
+
+  // 直近10回 / 通算
+  for (var i=1; i<vals.length; i++){
+    var row = vals[i];
+    if (row[1] !== user) continue;
+    var accuracy = Number(row[6] || 0);
+    recents.push({ date: row[0], points: row[3], accuracy: accuracy });
+    all.total += Number(row[5]||0);
+    all.correct += Number(row[4]||0);
+    all.points += Number(row[3]||0);
+    all.timeSum += Number(row[7]||0);
+    all.played += 1;
+  }
+  recents = recents.slice(-10);
+  var avgTime = all.played ? Math.round((all.timeSum / all.played) * 10)/10 : 0;
+  var accRate = all.total ? Math.round((all.correct / all.total) * 100) : 0;
+  return { recents: recents, summary: { played: all.played, points: all.points, accuracy: accRate, avgTime: avgTime } };
+}
+```
+
+## B-4) フロント側：GAS APIを呼ぶ（Aの手置き配列を置換）
+
+```html
+<script>
+  // GASデプロイURL（Webアプリ公開URL）に置き換え
+  const GAS_ENDPOINT = "https://script.google.com/macros/s/XXXX/exec";
+
+  async function fetchQuizItems() {
+    const res = await fetch(`${GAS_ENDPOINT}?action=items`);
+    const data = await res.json();
+    return (data.items || []).map((it, idx) => ({
+      id: idx+1,
+      brand: it.brand, color: it.color,
+      image: it.images && it.images.length ? it.images : null,
+      // 既存UIに合わせて必要なら dia/gdia/bc/hints を拡張
+      pattern: 'lens-pattern-1' // 画像が無い行のフォールバック用
+    }));
+  }
+
+  // initQuiz の前に差し替え
+  async function startDailyQuiz() {
+    quizState.mode = 'daily';
+    try {
+      const items = await fetchQuizItems();     // ← 取得
+      if (items.length) {
+        window.colorContacts = items;          // ← 既存 colorContacts を上書き
+      }
+    } catch(e) { console.warn(e); }
+    initQuiz();
+  }
+</script>
+```
+
+---
+
+# C. ランキング画面の実装（GAS連携 + 既存UI差し替え）
+
+> 既存のランキングUIに **API結果を流し込む** だけで完成します。
+
+```html
+<script>
+  async function loadRanking(scope='daily') {
+    const res = await fetch(`${GAS_ENDPOINT}?action=ranking&scope=${scope}`);
+    const data = await res.json();
+    const list = data.ranking || [];
+    const container = document.getElementById('rankingList');
+    container.innerHTML = '';
+
+    list.forEach((row, i) => {
+      const div = document.createElement('div');
+      div.className = 'ranking-item';
+      div.innerHTML = `
+        <div class="ranking-position">${i+1}</div>
+        <div class="ranking-user">
+          <div class="ranking-name">${row.user}</div>
+          <div class="ranking-store">${row.store || ''}</div>
+        </div>
+        <div class="ranking-score">
+          <div class="ranking-points">${row.points}pt</div>
+          <div class="ranking-rate">正答率 ${row.accRate}%</div>
+        </div>`;
+      if (row.user === currentUser.name) div.classList.add('current-user');
+      container.appendChild(div);
+    });
+  }
+
+  function showRanking() {
+    showPage('rankingPage');
+    loadRanking('daily');
+  }
+
+  function switchRankingTab(type, element) {
+    document.querySelectorAll('.ranking-tab').forEach(t => t.classList.remove('active'));
+    element.classList.add('active');
+    loadRanking(type);
+  }
+
+  // 結果確定時にサーバ保存（ランキング集計用）
+  async function submitResultToServer() {
+    const payload = {
+      action: 'submit',
+      user: currentUser.name,
+      store: currentUser.store,
+      score: quizState.score,
+      correct: quizState.correct,
+      total: quizState.totalQuestions,
+      accuracy: Math.round((quizState.correct/quizState.totalQuestions)*100),
+      timeSec: quizState.totalTime,
+      hints: quizState.totalHintsUsed,
+      dateISO: new Date().toISOString()
+    };
+    try {
+      await fetch(GAS_ENDPOINT, { method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload) });
+    } catch(e){ console.warn(e); }
+  }
+
+  // 既存 showResult() の最後に追加
+  // await submitResultToServer();
+</script>
+```
+
+---
+
+# D. マイ成績（ダッシュボード）実装
+
+> スマホ前提の軽いダッシュボードを追加します。**Noto Sans JP** をフォント基調に（要求事項）。**直近10回の推移**と**通算サマリ**、**連続日数**等を表示。
+
+### 1) フォント（Noto Sans JP）—— *プロジェクト同梱のフォントを使用*
+
+* `/public/fonts/NotoSansJP/` に `Noto_Sans_JP.zip` を解凍して配置（`*.woff2` 推奨）。
+* CSS：
+
+```css
+/* head内 */
+@font-face{
+  font-family: "Noto Sans JP";
+  src: url("./fonts/NotoSansJP/NotoSansJP-VariableFont_wght.woff2") format("woff2");
+  font-display: swap;
+}
+body { font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Meiryo", sans-serif; }
+```
+
+### 2) HTML（新規ページセクション）
+
+```html
+<!-- マイ成績ページ -->
+<div class="page ranking-page" id="statsPage" style="display:none;">
+  <div class="ranking-header">
+    <h2 class="ranking-title">📊 マイ成績</h2>
+    <p class="ranking-subtitle">直近10回の推移と通算サマリ</p>
+  </div>
+
+  <div class="ranking-list" style="padding:20px">
+    <div id="mySummary" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div class="result-stat"><div class="result-stat-label">累計ポイント</div><div class="result-stat-value" id="msPoints">-</div></div>
+      <div class="result-stat"><div class="result-stat-label">平均正答率</div><div class="result-stat-value" id="msAcc">-</div></div>
+      <div class="result-stat"><div class="result-stat-label">平均時間</div><div class="result-stat-value" id="msAvgTime">-</div></div>
+      <div class="result-stat"><div class="result-stat-label">受験回数</div><div class="result-stat-value" id="msPlayed">-</div></div>
+    </div>
+
+    <canvas id="recentChart" height="160" style="width:100%"></canvas>
+    <div style="font-size:12px;color:#666;margin-top:8px;">※ 直近10回のポイントと正答率</div>
+  </div>
+</div>
+```
+
+### 3) JS（取得＆描画）
+
+**外部ライブラリ不要版**（軽量）。Canvasに簡易棒/折れ線を描きます（Noto Sans JPのまま）。
+
+```html
+<script>
+  function showStats() {
+    showPage('statsPage');
+    loadMyStats();
+  }
+
+  async function loadMyStats() {
+    const user = encodeURIComponent(currentUser.name);
+    const res = await fetch(`${GAS_ENDPOINT}?action=mystats&user=${user}`);
+    const data = await res.json();
+
+    // サマリ
+    const sm = data.summary || {};
+    document.getElementById('msPoints').textContent  = (sm.points ?? 0) + 'pt';
+    document.getElementById('msAcc').textContent     = (sm.accuracy ?? 0) + '%';
+    document.getElementById('msAvgTime').textContent = (sm.avgTime ?? 0) + '秒';
+    document.getElementById('msPlayed').textContent  = (sm.played ?? 0) + '回';
+
+    // 直近10回の簡易チャート（棒=points / 折れ線=accuracy）
+    const cvs = document.getElementById('recentChart');
+    const ctx = cvs.getContext('2d');
+    ctx.clearRect(0,0,cvs.width,cvs.height);
+
+    const rec = data.recents || [];
+    if (!rec.length) { ctx.font = '14px "Noto Sans JP"'; ctx.fillText('データがありません', 10, 20); return; }
+
+    // 正規化
+    const W = cvs.width, H = cvs.height, P = 24;
+    const maxPt = Math.max(1, ...rec.map(r=>Number(r.points||0)));
+    // 軸
+    ctx.strokeStyle='#e0e0e0'; ctx.beginPath(); ctx.moveTo(P, H-P); ctx.lineTo(W-P, H-P); ctx.stroke();
+
+    // 棒（ポイント）
+    const bw = (W - P*2) / rec.length * 0.6;
+    rec.forEach((r,i)=>{
+      const x = P + i * ((W - P*2)/rec.length) + (((W - P*2)/rec.length)-bw)/2;
+      const h = Math.round((Number(r.points||0)/maxPt) * (H - P*2));
+      ctx.fillStyle = '#FF6EC7';
+      ctx.fillRect(x, H-P-h, bw, h);
+    });
+
+    // 折れ線（正答率）
+    ctx.strokeStyle='#764BA2'; ctx.beginPath();
+    rec.forEach((r,i)=>{
+      const x = P + i * ((W - P*2)/rec.length) + (((W - P*2)/rec.length)/2);
+      const y = H-P - Math.round((Number(r.accuracy||0)/100) * (H - P*2));
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      // マーカー
+      ctx.fillStyle='#764BA2'; ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2); ctx.fill();
+    });
+    ctx.stroke();
+
+    // ラベル
+    ctx.font = '12px "Noto Sans JP"'; ctx.fillStyle = '#666';
+    ctx.fillText('ポイント', 10, 12);
+    ctx.fillText('正答率', 70, 12);
+  }
+</script>
+```
+
+> これで **「ランキング」** と **「マイ成績」** の両ページが機能します。ランキングは要件の `quiz_history` を集計、マイ成績は直近10回と通算サマリを返すAPIで実装しました。
+> なお、現在のデモHTMLのボトムナビ「👤 マイページ」は `navigateTo('profile')` → `showStats()` を呼んでいるため、**`showStats()` が `statsPage` を表示** する今の実装でそのまま動きます。
+
+---
+
+# E. テスト手順（チェックリスト）
+
+1. **即効パッチのみ**で起動：トップ→クイズ→レンズ実画像が表示される（失敗時は既存パターンへ）。
+2. GASをデプロイ（新規/最新版Webアプリ）。`doGet?action=items` でJSONが返ることを確認。
+3. フロント `GAS_ENDPOINT` を差し替え、**データが手置き配列→APIのitemsに置換**されることを確認。
+4. 10問終了で `submitResultToServer()` が呼ばれ、`quiz_history` に追記される。
+5. ランキング：**タブ切替（デイリー/ウィークリー/マンスリー）** がそれぞれ値を更新する。
+6. マイ成績：直近10回がグラフに出る／サマリの値（累計ポイント・平均正答率など）が表示される。
+7. **Noto Sans JP** が全画面で効いている（グラフ描画の文字化けなし）。
+
+---
+
+## 補足（要件整合）
+
+* **画像URLはX列(24)** を採用（GASの `buildItem_` 参照）。GitHub画像群の命名規則（品番/ブランド/カラー/装用期間）に合わせれば、フロント直リンク/差分更新も容易です。
+* **GitHub直配信でOK**（社内利用・100GB/月枠内）。今回のフォールバックは raw→jsDelivr のみでCDN契約不要。
+* 既存デモHTMLの構成（ページID、ランキングUI骨格、ナビ）を尊重し、**最小変更**で機能拡張しています。
+
+---
+
+### ここまでの変更で得られる効果
+
+* **今日中に**レンズ実画像を問題へ表示（Aだけで可）。
+* **今週中に**GAS接続へ差し替えて運用に近づけ、**ランキング**と**マイ成績**まで通せます。
+* 既存の**自動画像更新フロー**（Colab→GitHub）とも整合。万一の権限/欠損は **フォールバック** でUIを止めません。
+
+---
+
+必要なら、このまま\*\*PR用の差分（patch）\*\*形式にもまとめます。進め方の希望（先に即効パッチをmainへ／ブランチを切って並走 など）があれば言ってください。

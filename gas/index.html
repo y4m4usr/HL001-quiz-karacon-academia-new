@@ -61,6 +61,7 @@
         .feedback-icon{font-size:48px;margin-bottom:16px}
         .feedback-title{font-size:24px;font-weight:bold;margin-bottom:12px}
         .feedback-message{color:#666;margin-bottom:24px}
+        .feedback-image{width:100px;height:100px;border-radius:12px;margin:0 auto 16px;display:none;object-fit:cover;border:2px solid #eee}
         .hidden{display:none!important}
         .text-center{text-align:center}
         .ranking-list{max-height:400px;overflow-y:auto}
@@ -197,6 +198,7 @@
             <div class="feedback-card" id="feedbackCard">
                 <div class="feedback-icon" id="feedbackIcon"></div>
                 <div id="feedbackTitle" class="feedback-title"></div>
+                <img id="feedbackImage" class="feedback-image" src="" alt="正解画像">
                 <div id="feedbackMessage" class="feedback-message"></div>
             </div>
         </div>
@@ -242,6 +244,7 @@ const App = (() => {
         feedbackIcon: document.getElementById('feedbackIcon'),
         feedbackTitle: document.getElementById('feedbackTitle'),
         feedbackMessage: document.getElementById('feedbackMessage'),
+        feedbackImage: document.getElementById('feedbackImage'),
     };
     // ページ表示切替
     function showPage(pageId) {
@@ -319,9 +322,9 @@ const App = (() => {
         UI.progressFill.style.width = `${(state.currentQuestionIndex + 1) * 10}%`;
         state.selectedAnswer = null; // 選択をリセット
 
-        // ★ 修正: プロキシ経由で画像を設定する
-        setImageWithProxy(UI.leftLens, q.imgL);
-        setImageWithProxy(UI.rightLens, q.imgR);
+        // ★ 修正: プロキシ経由でレンズ画像(lensUrl)を設定する
+        setImageWithProxy(UI.leftLens, q.lensUrl);
+        setImageWithProxy(UI.rightLens, q.lensUrl);
 
         UI.answerOptions.innerHTML = '';
         q.options.forEach(opt => {
@@ -376,12 +379,20 @@ const App = (() => {
     }
     // フィードバック
     function showFeedback(isCorrect, correctAnswer) {
+        const q = state.questions[state.currentQuestionIndex];
         UI.feedbackCard.className = 'feedback-card';
+        UI.feedbackImage.style.display = 'none'; // いったん隠す
+
         if (isCorrect) {
             UI.feedbackCard.classList.add('feedback-correct');
             UI.feedbackIcon.textContent = '🎉';
             UI.feedbackTitle.textContent = '正解！';
             UI.feedbackMessage.textContent = correctAnswer;
+            // v1.7: 正解時にサムネイル画像を表示
+            if (q.thumbUrl) {
+                UI.feedbackImage.style.display = 'block';
+                setImageWithProxy(UI.feedbackImage, q.thumbUrl);
+            }
         } else {
             UI.feedbackCard.classList.add('feedback-incorrect');
             UI.feedbackIcon.textContent = '❌';
