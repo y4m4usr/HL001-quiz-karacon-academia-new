@@ -6,7 +6,7 @@ const GITHUB_REPO = {
 };
 
 const SHEET_IDS = {
-  MASTER:   '12dYxk29Tj4Xv4E_VDdXnCPclQK72XZrSabdhi2SM_0Y', // HL001_テスト用_109販促データ（検証用）
+  MASTER:   '1EkTjV__k1vAl08PlbOUhYpbFEGC-F_LL_26o1-HT1AI', // HL001_テスト用_109販促データ（検証用）
   USERS:    '1X0TyeI_1zER6xIceUDSbJX-GFbqvi2orAiSWHRXlC7M',
   HISTORY:  '1ShWXLvY9RimRYfsAkwoRyM2Bfwj4a3zVmr5bQc33-o0',
   RANKINGS: '1I2REcy2v5OpyzoY3k61kCzJ3SYKOBBCMxTLCeHWutT8',

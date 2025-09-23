@@ -12,32 +12,36 @@
  */
 function buildQuestion_(correctCand, allCandidates) {
   const distractors = [];
+  const usedKeys = new Set([correctCand.key]); // 正解のキーを既に使用済みとして登録
   const allCandidatesShuffled = shuffle_([...allCandidates]);
-  
-  // v1.7: カテゴリが一致し、かつ色が似ているものを優先的に誤答選択肢として選ぶロジック (既存流用)
+
+  // 誤答選択肢を3つ探す
+  // 優先順位1: カテゴリが一致し、色が似ているもの
   for (const cand of allCandidatesShuffled) {
     if (distractors.length >= 3) break;
-    if (cand.key === correctCand.key) continue;
-    
+    if (usedKeys.has(cand.key)) continue; // 「ブランド｜カラー」が重複するものは除外
+
     const hasIntersection = [...correctCand.cats].some(cat => cand.cats.has(cat));
     if (!hasIntersection) continue;
-    
-    // この類似度判定は簡略化されているため、v1.7の要件に応じて調整が必要
+
     const sim = colorSim_(correctCand.color, cand.color);
     if (sim < 0.15) continue; // 類似度の閾値
-    
+
     distractors.push(cand.key);
+    usedKeys.add(cand.key);
   }
 
-  // それでも足りなければ、カテゴリや色の一致を問わずランダムに補充
+  // 優先順位2: それでも足りなければ、カテゴリや色の一致を問わずランダムに補充
   if (distractors.length < 3) {
-      for (const cand of allCandidatesShuffled) {
-          if (distractors.length >= 3) break;
-          if (cand.key === correctCand.key || distractors.includes(cand.key)) continue;
-          distractors.push(cand.key);
-      }
+    for (const cand of allCandidatesShuffled) {
+      if (distractors.length >= 3) break;
+      if (usedKeys.has(cand.key)) continue; // 「ブランド｜カラー」が重複するものは除外
+
+      distractors.push(cand.key);
+      usedKeys.add(cand.key);
+    }
   }
-  
+
   if (distractors.length < 3) return null; // 誤答が3件作れない場合は問題作成不可
 
   const options = [correctCand.key, ...distractors];

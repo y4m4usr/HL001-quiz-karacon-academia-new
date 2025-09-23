@@ -1,5 +1,3 @@
-
-
 // ===================================================================
 // データアクセス (スプレッドシート、カテゴリマッピング)
 // ===================================================================
@@ -30,7 +28,13 @@ function getQuestions(params) {
     const catMap = buildCategoryMap_(categoryData);
     const candidates = buildCandidates_(masterData, catMap);
     
-    if (candidates.length < 4) {
+    // v1.7 堅牢化: 候補リストの総数と、ユニークなキーの数をチェックする
+    const uniqueKeys = new Set(candidates.map(c => c.key));
+    Logger.log(`有効な候補データの総数: ${candidates.length}件`);
+    Logger.log(`ユニークな「ブランド｜カラー」の組み合わせ数: ${uniqueKeys.size}件`);
+
+    if (uniqueKeys.size < 4) {
+      // 正解1件＋不正解3件のユニークな組み合わせが作れないため、ここでエラーとする
       throw new Error('クイズを作成するのに十分なデータがありません（最低4件必要です）。');
     }
 
@@ -66,12 +70,11 @@ function getQuestions(params) {
 function buildCandidates_(masterData, catMap) {
   const candidates = [];
   const C = COLS.MASTER; // Config.gsから
-  const colIndex = col => col.charCodeAt(0) - 'A'; // 'A'->0, 'B'->1... 
 
   masterData.forEach(row => {
-    const brand = s_(row[colIndex(C.BRAND)]);
-    const color = s_(row[colIndex(C.COLOR)]);
-    const lensUrlFromSheet = s_(row[colIndex(C.LENS_URL)]);
+    const brand = s_(row[colLetterToIndex_(C.BRAND)]);
+    const color = s_(row[colLetterToIndex_(C.COLOR)]);
+    const lensUrlFromSheet = s_(row[colLetterToIndex_(C.LENS_URL)]);
 
     // v1.7: データ完備の商品のみを出題対象とする
     if (!brand || !color || !lensUrlFromSheet) return; 
@@ -79,8 +82,8 @@ function buildCandidates_(masterData, catMap) {
     const key = `${brand}｜${color}`;
     if (!catMap.has(key)) return;
 
-    const productCode = s_(row[colIndex(C.PRODUCT_CODE)]);
-    const wearPeriod = s_(row[colIndex(C.WEAR_PERIOD)]);
+    const productCode = s_(row[colLetterToIndex_(C.PRODUCT_CODE)]);
+    const wearPeriod = s_(row[colLetterToIndex_(C.WEAR_PERIOD)]);
 
     // v1.7: 新しい命名規則でファイル名を生成
     const imageName = `${productCode}_${sanitizeForUrl_(brand)}_${sanitizeForUrl_(color)}_${sanitizeForUrl_(wearPeriod)}_lens.jpg`;
@@ -91,10 +94,10 @@ function buildCandidates_(masterData, catMap) {
       brand: brand,
       color: color,
       lensUrl: githubUrl, // v1.7: 動的に生成したレンズ画像URL
-      thumbUrl: s_(row[colIndex(C.THUMB_URL)]), // v1.7: サムネURLはW列をそのまま使用
+      thumbUrl: s_(row[colLetterToIndex_(C.THUMB_URL)]), // v1.7: サムネURLはW列をそのまま使用
       cats: catMap.get(key).cats,
-      hint1: `DIA:${s_(row[colIndex(C.DIA)])} / G.DIA:${s_(row[colIndex(C.GDIA)])} / BC:${s_(row[colIndex(C.BC)])}`,
-      hint2: s_(row[colIndex(C.COMMENT)])
+      hint1: `DIA:${s_(row[colLetterToIndex_(C.DIA)])} / G.DIA:${s_(row[colLetterToIndex_(C.GDIA)])} / BC:${s_(row[colLetterToIndex_(C.BC)])}`,
+      hint2: s_(row[colLetterToIndex_(C.COMMENT)])
     });
   });
   return candidates;
@@ -126,6 +129,19 @@ function buildCategoryMap_(categoryData){
 // ===================================================================
 
 /**
+ * スプレッドシートの列文字 (A, B, AA, ALなど) を0ベースのインデックスに変換する
+ * @param {string} col - 列文字
+ * @returns {number} 0ベースの列インデックス
+ */
+function colLetterToIndex_(col) {
+  let index = 0;
+  for (let i = 0; i < col.length; i++) {
+    index = index * 26 + (col.charCodeAt(i) - 64);
+  }
+  return index - 1;
+}
+
+/**
  * Pythonのsanitize_filenameと互換性のあるファイル名サニタイズ関数
  */
 function sanitizeForUrl_(name) {
@@ -137,3 +153,71 @@ function sanitizeForUrl_(name) {
  * 値をトリムして文字列に変換する
  */
 function s_(v){return(v===null||v===undefined)?'':String(v).trim()}
+
+/**
+ * ===================================================================
+ * デバッグ用関数
+ * ===================================================================
+ */
+function debugDataProcessing() {
+  try {
+    const ss = SpreadsheetApp.openById(SHEET_IDS.MASTER);
+    const shM = ss.getSheetByName('master');
+    const shC = ss.getSheetByName(CATEGORY_SHEET_NAME);
+
+    if (!shM) return { error: '「master」シートが見つかりません。' };
+    if (!shC) return { error: `「${CATEGORY_SHEET_NAME}」シートが見つかりません。` };
+
+    const masterData = shM.getRange(3, 1, shM.getLastRow() - 2, shM.getLastColumn()).getValues();
+    const categoryData = shC.getRange(3, 1, shC.getLastRow() - 2, shC.getLastColumn()).getValues();
+    
+    const catMap = buildCategoryMap_(categoryData);
+
+    const C = COLS.MASTER;
+
+    let totalMasterRows = masterData.length;
+    let passedFieldCheck = 0;
+    let passedCategoryCheck = 0;
+    const validCandidateKeys = new Set();
+    
+    const discardedForFields = [];
+    const discardedForCategory = [];
+
+    masterData.forEach((row, index) => {
+      const brand = s_(row[colLetterToIndex_(C.BRAND)]);
+      const color = s_(row[colLetterToIndex_(C.COLOR)]);
+      const lensUrlFromSheet = s_(row[colLetterToIndex_(C.LENS_URL)]);
+
+      if (!brand || !color || !lensUrlFromSheet) {
+        if (discardedForFields.length < 5) { // 最初の5件をサンプルとして記録
+          discardedForFields.push(`masterシートの ${index + 3}行目: 必須項目が空です (ブランド: '${brand}', カラー: '${color}', レンズURL: '${lensUrlFromSheet}')`);
+        }
+        return;
+      }
+      passedFieldCheck++;
+
+      const key = `${brand}｜${color}`;
+      if (!catMap.has(key)) {
+        if (discardedForCategory.length < 5) { // 最初の5件をサンプルとして記録
+          discardedForCategory.push(`masterシートの ${index + 3}行目: キー「${key}」がカラーカテゴリシートに存在しません。`);
+        }
+        return;
+      }
+      passedCategoryCheck++;
+      validCandidateKeys.add(key);
+    });
+
+    return {
+      step1_totalMasterRows: totalMasterRows,
+      step2_passedFieldCheck: passedFieldCheck,
+      step3_passedCategoryCheck: passedCategoryCheck,
+      step4_finalUniqueCandidates: validCandidateKeys.size,
+      info_discardedForFields_count: totalMasterRows - passedFieldCheck,
+      info_discardedForCategory_count: passedFieldCheck - passedCategoryCheck,
+      debug_examples_discardedForFields: discardedForFields,
+      debug_examples_discardedForCategory: discardedForCategory,
+    };
+  } catch (e) {
+    return { error: 'デバッグ処理中に予期せぬエラーが発生しました: ' + e.message, stack: e.stack };
+  }
+}
