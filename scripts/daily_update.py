@@ -1,115 +1,155 @@
 import os
 import json
+import re
+import io
 import gspread
 from google.oauth2.service_account import Credentials
-import re
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
 # --- ユーザー設定 ---
-# GitHubリポジトリ情報 (user/repo)
 GITHUB_OWNER_REPO = 'y4m4usr/HL001-quiz-karacon-academia-new'
 GITHUB_BRANCH = 'main'
-
-# スプレッドシート情報 (通常は変更不要)
 SPREADSHEET_ID = '12dYxk29Tj4Xv4E_VDdXnCPclQK72XZrSabdhi2SM_0Y'
 SHEET_NAME = 'master'
 LOCAL_IMAGE_DIR = 'images/_lensimage'
 
-# スプレッドシートの列設定 (通常は変更不要)
+# スプレッドシートの列設定
 COL_SERIES = 9
 COL_COLOR = 10
-COL_IMG = 24
+COL_IMG_URL = 24 # Google Drive URLの読み取り元であり、GitHub URLの書き込み先
 
-# --- スクリプト本体 (ここから下は編集不要) ---
+# --- スクリプト本体 ---
 
 def get_google_credentials():
-    """環境変数からGoogle認証情報を読み込みます。"""
+    """環境変数からGoogle認証情報を読み込み、必要なスコープを設定します。"""
     creds_json_str = os.getenv('GOOGLE_CREDENTIALS')
     if not creds_json_str:
         raise ValueError("環境変数 'GOOGLE_CREDENTIALS' が設定されていません。")
     
-    scopes = ['https://www.googleapis.com/auth/spreadsheets']
-    return Credentials.from_service_account_info(
-        json.loads(creds_json_str), scopes=scopes
-    )
+    creds_info = json.loads(creds_json_str)
+    
+    # スプレッドシートとGoogle Driveの両方のスコープを追加
+    scopes = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.readonly'
+    ]
+    
+    return Credentials.from_service_account_info(creds_info, scopes=scopes)
+
+def get_drive_service(creds):
+    """Google Drive APIサービスを構築します。"""
+    return build('drive', 'v3', credentials=creds)
+
+def extract_drive_file_id(url):
+    """Google Driveの共有URLからファイルIDを抽出します。"""
+    match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', url)
+    if match:
+        return match.group(1)
+    return None
+
+def sanitize_filename(name):
+    """安全なファイル名を生成します。"""
+    # 全角スペースを半角スペースに
+    name = name.replace('　', ' ')
+    # 不許可文字をアンダースコアに置換
+    return re.sub(r'[\/:*?"<>|]', '_', name)
+
+def download_image_from_drive(service, file_id, save_path):
+    """Google Driveからファイルをダウンロードして保存します。"""
+    request = service.files().get_media(fileId=file_id)
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+        print(f"  > ダウンロード中: {int(status.progress() * 100)}%")
+
+    with open(save_path, 'wb') as f:
+        f.write(fh.getvalue())
+    print(f"  > 保存完了: {save_path}")
 
 def get_github_raw_url(owner_repo, branch, image_path):
     """GitHubのRaw URLを生成します。"""
-    # Windowsのパス区切り文字(\)をURLの(/)に変換
     image_path = image_path.replace('\\', '/')
     return f"https://raw.githubusercontent.com/{owner_repo}/{branch}/{image_path}"
 
-def parse_filename_to_key(filename):
-    """ファイル名からシートのキーを生成します (例: 0002_アイクローゼット_ちびこっぺぱん.jpg -> アイクローゼット｜ちびこっぺぱん)"""
-    # 拡張子を取り除く
-    name_without_ext = os.path.splitext(filename)[0]
-    # 数字とアンダースコアで始まる部分を削除
-    parts = name_without_ext.split('_', 1)
-    if len(parts) < 2:
-        return None
-    
-    # ブランド名とカラー名に分割
-    key_parts = parts[1].split('_', 1)
-    if len(key_parts) < 2:
-        return None
-        
-    return f"{key_parts[0]}｜{key_parts[1]}"
-
 def main():
     """メイン処理"""
-    print("--- スプレッドシート更新スクリプト開始 (GitHub URLモード) ---")
+    print("--- スプレッドシート更新スクリプト開始 (Google Drive連携モード) ---")
 
     try:
-        # 1. 認証
+        # 1. 認証とサービス準備
         creds = get_google_credentials()
         gc = gspread.authorize(creds)
+        drive_service = get_drive_service(creds)
 
-        # 2. ローカル画像から「シートのキー -> GitHub URL」のマップを作成
-        print(f"ローカルの`{LOCAL_IMAGE_DIR}`フォルダをスキャン中...")
-        local_files = os.listdir(LOCAL_IMAGE_DIR)
-        key_to_url_map = {}
-        for filename in local_files:
-            if not filename.lower().endswith('.jpg'):
-                continue
-            
-            sheet_key = parse_filename_to_key(filename)
-            if sheet_key:
-                full_path = os.path.join(LOCAL_IMAGE_DIR, filename)
-                github_url = get_github_raw_url(GITHUB_OWNER_REPO, GITHUB_BRANCH, full_path)
-                key_to_url_map[sheet_key] = github_url
-        print(f"{len(key_to_url_map)}件の画像キーとURLのマップを作成しました。")
+        # 2. ローカルの画像保存ディレクトリを作成
+        os.makedirs(LOCAL_IMAGE_DIR, exist_ok=True)
 
-        # 3. スプレッドシートを更新
-        print("スプレッドシートを更新中...")
+        # 3. スプレッドシートを開いて全データを取得
+        print("スプレッドシートからデータを取得中...")
         worksheet = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_NAME)
-        
-        records = worksheet.get_all_values()[2:] # ヘッダーを除いて3行目から取得
-        
+        records = worksheet.get_all_values()
+        header = records[1] # 2行目をヘッダーとする
+        data_rows = records[2:] # 3行目からデータ
+
         updates = []
-        for i, row in enumerate(records):
-            if not row or len(row) < COL_COLOR:
-                continue
-
-            series = row[COL_SERIES - 1]
-            color = row[COL_COLOR - 1]
+        
+        # 4. 各行を処理
+        for i, row in enumerate(data_rows):
+            row_num = i + 3 # スプレッドシートの行番号 (3から始まる)
             
-            if not series or not color:
+            if not row or len(row) < COL_IMG_URL:
                 continue
 
-            sheet_key = f"{series}｜{color}"
-            current_url = row[COL_IMG - 1] if len(row) >= COL_IMG else ''
+            series = row[COL_SERIES - 1].strip()
+            color = row[COL_COLOR - 1].strip()
+            url_cell_value = row[COL_IMG_URL - 1].strip()
 
-            if sheet_key in key_to_url_map:
-                new_url = key_to_url_map[sheet_key]
-                if new_url != current_url:
-                    cell_to_update = gspread.cell.Cell(row=i + 3, col=COL_IMG, value=new_url)
-                    updates.append(cell_to_update)
-                    print(f"  - 更新: {sheet_key} (行: {i+3})")
+            if not series or not color or not url_cell_value:
+                continue
 
+            # 5. URLがGoogle Driveのものかチェック
+            if 'drive.google.com' in url_cell_value:
+                print(f"処理中: {row_num}行目 - {series}｜{color}")
+                
+                file_id = extract_drive_file_id(url_cell_value)
+                if not file_id:
+                    print(f"  - 警告: 有効なGoogle DriveファイルIDが見つかりません。スキップします。")
+                    continue
+                
+                try:
+                    # 6. 画像をダウンロード
+                    # ファイル名を「シリーズ_カラー.jpg」で統一
+                    sanitized_series = sanitize_filename(series)
+                    sanitized_color = sanitize_filename(color)
+                    filename = f"{sanitized_series}_{sanitized_color}.jpg"
+                    save_path = os.path.join(LOCAL_IMAGE_DIR, filename)
+                    
+                    download_image_from_drive(drive_service, file_id, save_path)
+
+                    # 7. GitHubのURLを生成し、更新リストに追加
+                    new_github_url = get_github_raw_url(GITHUB_OWNER_REPO, GITHUB_BRANCH, save_path)
+                    
+                    if new_github_url != url_cell_value:
+                        cell_to_update = gspread.cell.Cell(row=row_num, col=COL_IMG_URL, value=new_github_url)
+                        updates.append(cell_to_update)
+                        print(f"  - URLを更新: {new_github_url}")
+                    else:
+                        print("  - URLは既に最新です。")
+
+                except Exception as e:
+                    print(f"  - エラー: {row_num}行目の処理中にエラーが発生しました: {e}")
+        
+        # 8. スプレッドシートを一括更新
         if updates:
+            print(f"\n{len(updates)}件の画像URLをスプレッドシートに反映します...")
             worksheet.update_cells(updates, value_input_option='USER_ENTERED')
-            print(f"{len(updates)}件の画像URLを更新しました。")
+            print("更新が完了しました。")
         else:
-            print("スプレッドシートの更新は不要でした。")
+            print("\nスプレッドシートの更新は不要でした。")
 
         print("--- スクリプト正常終了 ---")
 
