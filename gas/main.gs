@@ -49,6 +49,6 @@ function getGitHubImageAsBase64(githubUrl) {
 
   } catch (err) {
     console.error("GitHub Image proxy error for URL " + githubUrl + ": " + err.toString());
-    return { success: false, error: err.message };
+    return { success: false, error: `Failed to fetch image. URL: ${githubUrl}. Error: ${err.message}` };
   }
 }

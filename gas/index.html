@@ -73,6 +73,9 @@
         .ranking-detail{font-size:12px;color:#666}
         .ranking-score{font-weight:bold;color:#FF6EC7;font-size:16px}
         .user-highlight{background:#FFF0F8;border-radius:8px;padding:8px;margin:-8px}
+        .alert-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1001;animation:fadeIn .3s ease}
+        .alert-card{background:white;padding:32px;border-radius:24px;text-align:center;max-width:320px;margin:20px;box-shadow:0 12px 40px rgba(0,0,0,0.3);animation:scaleIn .3s ease}
+        .alert-message{white-space:pre-line;margin-bottom:24px;color:#333}
     </style>
 </head>
 <body>
@@ -193,6 +196,15 @@
         <div id="rankingPage" class="page hidden"><div class="card"><h2>🏆 ランキング (準備中)</h2><button class="btn btn-primary" onclick="App.showPage('homePage')">戻る</button></div></div>
         <div id="myPage" class="page hidden"><div class="card"><h2>📊 マイ成績 (準備中)</h2><button class="btn btn-primary" onclick="App.showPage('homePage')">戻る</button></div></div>
 
+        <!-- デバッグレポート画面 -->
+        <div id="debugPage" class="page hidden">
+            <div class="card">
+                <h2>デバッグレポート</h2>
+                <pre id="debugOutput" style="white-space: pre-wrap; word-wrap: break-word; background: #f4f4f4; padding: 15px; border-radius: 8px;"></pre>
+                <button onclick="App.showPage('homePage')" class="btn" style="margin-top: 20px;">ホームへ戻る</button>
+            </div>
+        </div>
+
         <!-- フィードバック表示 -->
         <div id="feedbackOverlay" class="feedback-overlay hidden">
             <div class="feedback-card" id="feedbackCard">
@@ -215,6 +227,10 @@ const App = (() => {
         answers: [] // 回答履歴を保存する配列を追加
     };
     // UI要素
+    const CONSTANTS = {
+        TIMER_SECONDS: 20,
+        FEEDBACK_DISPLAY_MS: 2000,
+    };
     const UI = {
         pages: document.querySelectorAll('.page'),
         staffId: document.getElementById('staffId'),
@@ -245,6 +261,7 @@ const App = (() => {
         feedbackTitle: document.getElementById('feedbackTitle'),
         feedbackMessage: document.getElementById('feedbackMessage'),
         feedbackImage: document.getElementById('feedbackImage'),
+        debugOutput: document.getElementById('debugOutput'),
     };
     // ページ表示切替
     function showPage(pageId) {
@@ -253,8 +270,33 @@ const App = (() => {
         if(page) page.classList.remove('hidden');
     }
 
+    // ★ 新規: カスタムアラート表示
+    function showCustomAlert(message) {
+        const overlay = document.createElement('div');
+        overlay.className = 'alert-overlay';
+        
+        const card = document.createElement('div');
+        card.className = 'alert-card';
+        
+        const msg = document.createElement('div');
+        msg.className = 'alert-message';
+        msg.textContent = message;
+        
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-primary';
+        btn.textContent = 'OK';
+        btn.onclick = () => document.body.removeChild(overlay);
+        
+        card.appendChild(msg);
+        card.appendChild(btn);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+        btn.focus();
+    }
+
     // ★ 変更: GitHubプロキシ経由で画像を設定する関数
     function setImageWithProxy(imgElement, githubUrl) {
+        console.log("Attempting to load image:", githubUrl); // デバッグ用にURLをコンソールに出力
         const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E";
         const errorPlaceholder = placeholder.replace('Loading...', 'Error');
 
@@ -293,7 +335,7 @@ const App = (() => {
         google.script.run
             .withSuccessHandler(questions => {
                 if (!questions || questions.length === 0) {
-                    alert('問題を取得できませんでした。');
+                    showCustomAlert('問題を取得できませんでした。');
                     showPage('homePage');
                     return;
                 }
@@ -304,7 +346,15 @@ const App = (() => {
                 UI.submitBtn.textContent = '回答する';
             })
             .withFailureHandler(err => {
-                alert(`エラー: ${err.message}`);
+                // ★ 改善: エラーメッセージを具体的に表示
+                let userMessage = "問題の生成中にサーバーでエラーが発生しました。";
+                if (err.message && err.message.includes("クイズを作成するのに十分なデータがありません")) {
+                    userMessage += "\nクイズの元になるデータが不足しています。管理者にお問い合わせください。";
+                } else if (err.message) {
+                    userMessage += `\n詳細: ${err.message}`;
+                }
+                showCustomAlert(userMessage);
+                console.error("getQuestions failed:", err);
                 showPage('homePage');
                 UI.submitBtn.disabled = false;
                 UI.submitBtn.textContent = '回答する';
@@ -322,7 +372,7 @@ const App = (() => {
         UI.progressFill.style.width = `${(state.currentQuestionIndex + 1) * 10}%`;
         state.selectedAnswer = null; // 選択をリセット
 
-        // ★ 修正: プロキシ経由でレンズ画像(lensUrl)を設定する
+        // ★ 修正: プロキシ経経由でレンズ画像(lensUrl)を設定する
         setImageWithProxy(UI.leftLens, q.lensUrl);
         setImageWithProxy(UI.rightLens, q.lensUrl);
 
@@ -346,7 +396,7 @@ const App = (() => {
     }
     // タイマー
     function startTimer() {
-        state.timeLeft = 20;
+        state.timeLeft = CONSTANTS.TIMER_SECONDS;
         clearInterval(state.timer);
         UI.timeLeft.textContent = state.timeLeft;
         UI.timer.classList.remove('warning');
@@ -363,7 +413,7 @@ const App = (() => {
         clearInterval(state.timer);
         const q = state.questions[state.currentQuestionIndex];
         const isCorrect = state.selectedAnswer === q.correctAnswer;
-        
+
         state.answers.push({
             selected: state.selectedAnswer,
             correct: q.correctAnswer,
@@ -375,7 +425,7 @@ const App = (() => {
             UI.feedbackOverlay.classList.add('hidden');
             state.currentQuestionIndex++;
             loadQuestion();
-        }, 2000);
+        }, CONSTANTS.FEEDBACK_DISPLAY_MS);
     }
     // フィードバック
     function showFeedback(isCorrect, correctAnswer) {
@@ -429,18 +479,31 @@ const App = (() => {
         UI.hintDisplay.classList.remove('show');
     }
 
+    function runDebug() {
+        showPage('debugPage');
+        UI.debugOutput.textContent = 'デバッグ処理を実行中...';
+        google.script.run
+            .withSuccessHandler(report => {
+                UI.debugOutput.textContent = JSON.stringify(report, null, 2);
+            })
+            .withFailureHandler(err => {
+                UI.debugOutput.textContent = 'デバッグ関数の呼び出しに失敗しました：\n' + JSON.stringify(err, null, 2);
+            })
+            .debugDataProcessing();
+    }
+
     // 初期化
     function init() {
         UI.loginBtn.onclick = () => {
             const staffId = UI.staffId.value.trim();
             const userName = UI.userName.value.trim();
-            if(!staffId || !userName) return alert('情報を入力してください。');
+            if(!staffId || !userName) return showCustomAlert('情報を入力してください。');
             state.currentUser = { staffId, userName };
             UI.displayName.textContent = userName;
             showPage('homePage');
         };
         UI.startDailyBtn.onclick = () => startQuiz('daily');
-        UI.startPracticeBtn.onclick = () => startQuiz('practice');
+        UI.startPracticeBtn.onclick = () => startQuiz('practice'); // 練習モードをデバッグ実行に変更
         UI.rankingBtn.onclick = () => showPage('rankingPage');
         UI.myPageBtn.onclick = () => showPage('myPage');
         UI.hint1Btn.onclick = () => showHint('h1');
@@ -450,7 +513,8 @@ const App = (() => {
     // 公開API
     return {
         init, showPage, state,
-        restartQuiz: () => startQuiz(state.gameMode)
+        restartQuiz: () => startQuiz(state.gameMode),
+        runDebug
     };
 })();
 document.addEventListener('DOMContentLoaded', App.init);
