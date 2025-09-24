@@ -1,0 +1,35 @@
+name: manifest-legacy
+on:
+  push:
+    paths:
+      - 'images/**'
+      - 'tools/manifest_legacy.py'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Generate manifests from images/*
+        run: |
+          python tools/manifest_legacy.py
+          echo "::group::manifest head"
+          head -n 30 manifests/lens.json || true
+          echo "::endgroup::"
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: 'chore(manifest): auto-update legacy manifests [skip ci]'
+          title: 'chore: update manifests (legacy scan)'
+          body: |
+            Auto-generated manifests from images/*
+            - Strict naming only (G/I/J/K/type). Others excluded by design.
+          branch: 'ci/manifest-legacy'
+          delete-branch: true
