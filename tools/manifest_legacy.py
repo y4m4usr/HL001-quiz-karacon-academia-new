@@ -3,6 +3,7 @@ import re
 import json
 import hashlib
 
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 IMG_DIRS = [
     ('lens', os.path.join(ROOT, 'images', 'lens')),
@@ -21,28 +22,23 @@ PERIOD_MAP = {
 }
 
 
-def sanitize(value):
-    if value is None:
+def sanitize(s):
+    if s is None:
         return ''
-    text = str(value).strip()
-    text = text.replace('\u3000', '_').replace(' ', '_')
-    text = re.sub(r'[・,、，/／]', '_', text)
-    text = re.sub(r'[_]+', '_', text)
-    return text.lower()
+    s = str(s).strip()
+    s = s.replace('\u3000', '_').replace(' ', '_')
+    s = re.sub(r'[・,、，/／]', '_', s)
+    s = re.sub(r'[_]+', '_', s)
+    return s.lower()
 
 
-def norm_period(key):
-    key = sanitize(key)
-    return PERIOD_MAP.get(key, key)
+def norm_period(k):
+    k = sanitize(k)
+    return PERIOD_MAP.get(k, k)
 
 
 def key_from_parts(code, brand, color, period):
-    return '|'.join([
-        sanitize(code),
-        sanitize(brand),
-        sanitize(color),
-        norm_period(period),
-    ])
+    return '|'.join([sanitize(code), sanitize(brand), sanitize(color), norm_period(period)])
 
 
 rx_lens = re.compile(r'^(?P<code>.+?)_(?P<brand>.+?)_(?P<color>.+?)_(?P<per>.+?)_lens\.jpg$', re.I)
@@ -50,44 +46,43 @@ rx_samune = re.compile(r'^(?P<code>.+?)_(?P<brand>.+?)_(?P<color>.+?)_(?P<per>.+
 
 
 def sha256sum(path):
-    digest = hashlib.sha256()
-    with open(path, 'rb') as handle:
-        for chunk in iter(lambda: handle.read(8192), b''):
-            digest.update(chunk)
-    return digest.hexdigest()
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def main():
     os.makedirs(os.path.join(ROOT, 'manifests'), exist_ok=True)
     out = {'lens': {}, 'samune': {}}
-    for typ, directory in IMG_DIRS:
-        if not os.path.isdir(directory):
+    for typ, d in IMG_DIRS:
+        if not os.path.isdir(d):
             continue
-        for filename in os.listdir(directory):
-            if not filename.lower().endswith('.jpg'):
+        for fn in os.listdir(d):
+            if not fn.lower().endswith('.jpg'):
                 continue
-            matcher = rx_lens if typ == 'lens' else rx_samune
-            match = matcher.match(filename)
-            if not match:
+            m = (rx_lens if typ == 'lens' else rx_samune).match(fn)
+            if not m:
                 continue
-            code = match['code']
-            brand = match['brand']
-            color = match['color']
-            period = match['per']
-            key = key_from_parts(code, brand, color, period)
-            rel_path = f'images/{typ}/{filename}'
-            out[typ][key] = {
-                'file': filename,
-                'path': rel_path,
+            code = m['code']
+            brand = m['brand']
+            color = m['color']
+            per = m['per']
+            k = key_from_parts(code, brand, color, per)
+            rel = f'images/{typ}/{fn}'
+            out[typ][k] = {
+                'file': fn,
+                'path': rel,
                 'shard': 'LEGACY',
-                'sha256': sha256sum(os.path.join(directory, filename)),
+                'sha256': sha256sum(os.path.join(d, fn)),
                 'w': 0,
                 'h': 0,
             }
-    with open(os.path.join(ROOT, 'manifests', 'lens.json'), 'w', encoding='utf-8') as handle:
-        json.dump(out['lens'], handle, ensure_ascii=False, indent=2)
-    with open(os.path.join(ROOT, 'manifests', 'samune.json'), 'w', encoding='utf-8') as handle:
-        json.dump(out['samune'], handle, ensure_ascii=False, indent=2)
+    with open(os.path.join(ROOT, 'manifests', 'lens.json'), 'w', encoding='utf-8') as f:
+        json.dump(out['lens'], f, ensure_ascii=False, indent=2)
+    with open(os.path.join(ROOT, 'manifests', 'samune.json'), 'w', encoding='utf-8') as f:
+        json.dump(out['samune'], f, ensure_ascii=False, indent=2)
     print('generated counts:', len(out['lens']), len(out['samune']))
 
 
