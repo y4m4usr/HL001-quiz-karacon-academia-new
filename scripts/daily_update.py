@@ -153,9 +153,14 @@ def raw_url(path_in_repo:str)->str:
 # ========== Google 認証/取得 ========== 
 
 def gcreds_from_env():
-    if not GOOGLE_CREDENTIALS: 
-        die('GOOGLE_CREDENTIALS が未設定')
-    info = json.loads(GOOGLE_CREDENTIALS)
+    info_json = (GOOGLE_CREDENTIALS or '').strip()
+    path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '').strip()
+    if not info_json and path:
+        with open(path, 'r', encoding='utf-8') as f:
+            info_json = f.read()
+    if not info_json:
+        die('GOOGLE_CREDENTIALS か GOOGLE_APPLICATION_CREDENTIALS のいずれかを設定してください')
+    info = json.loads(info_json)
     scopes = [
         'https://www.googleapis.com/auth/drive.readonly',
         'https://www.googleapis.com/auth/spreadsheets.readonly'
@@ -210,7 +215,12 @@ def clone_or_reset_repo():
     if GH_CLONE_SSH:
         url = f'git@github.com:{GH_OWNER}/{GH_REPO}.git'
     else:
-        url = f'https://{GITHUB_TOKEN}@github.com/{GH_OWNER}/{GH_REPO}.git'
+        if GITHUB_TOKEN:
+            url = f'https://{GITHUB_TOKEN}@github.com/{GH_OWNER}/{GH_REPO}.git'
+        elif DRY_RUN:
+            url = f'https://github.com/{GH_OWNER}/{GH_REPO}.git'
+        else:
+            die('GITHUB_TOKEN が未設定です（DRY_RUNでない場合は必須）')
     run(['git','clone','--depth','1','--branch',GH_BRANCH,url,str(REPO_DIR)])
 
 def git_status_changes()->bool:
