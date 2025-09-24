@@ -7,13 +7,12 @@ HL001 Strict Daily Update
 - Drive→検証→シャード配置→manifest生成→コミット→PR→レポート
 """
 
-import os, re, io, sys, json, csv, shutil, hashlib, subprocess, textwrap, time
+import os, re, io, sys, json, csv, shutil, hashlib, subprocess, textwrap, time, unicodedata
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import requests
-import jaconv
 from PIL import Image
 
 import gspread
@@ -109,7 +108,7 @@ def shard_hex(key:str)->str:
 def sanitize(s:str)->str:
     if s is None: return ''
     s = str(s).strip()
-    s = jaconv.z2h(s, kana=False, digit=True, ascii=True)
+    s = unicodedata.normalize('NFKC', s)
     s = re.sub(r'[ \u3000]+', '_', s)
     s = re.sub(r'[・,、，/／]', '_', s)
     s = re.sub(r'[\:*?"<>|#%&{{}}$!@+=`^()[\]{{}}＜＞￥]', '', s)
@@ -153,14 +152,9 @@ def raw_url(path_in_repo:str)->str:
 # ========== Google 認証/取得 ========== 
 
 def gcreds_from_env():
-    info_json = (GOOGLE_CREDENTIALS or '').strip()
-    path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '').strip()
-    if not info_json and path:
-        with open(path, 'r', encoding='utf-8') as f:
-            info_json = f.read()
-    if not info_json:
-        die('GOOGLE_CREDENTIALS か GOOGLE_APPLICATION_CREDENTIALS のいずれかを設定してください')
-    info = json.loads(info_json)
+    if not GOOGLE_CREDENTIALS: 
+        die('GOOGLE_CREDENTIALS が未設定')
+    info = json.loads(GOOGLE_CREDENTIALS)
     scopes = [
         'https://www.googleapis.com/auth/drive.readonly',
         'https://www.googleapis.com/auth/spreadsheets.readonly'
@@ -215,12 +209,7 @@ def clone_or_reset_repo():
     if GH_CLONE_SSH:
         url = f'git@github.com:{GH_OWNER}/{GH_REPO}.git'
     else:
-        if GITHUB_TOKEN:
-            url = f'https://{GITHUB_TOKEN}@github.com/{GH_OWNER}/{GH_REPO}.git'
-        elif DRY_RUN:
-            url = f'https://github.com/{GH_OWNER}/{GH_REPO}.git'
-        else:
-            die('GITHUB_TOKEN が未設定です（DRY_RUNでない場合は必須）')
+        url = f'https://{GITHUB_TOKEN}@github.com/{GH_OWNER}/{GH_REPO}.git'
     run(['git','clone','--depth','1','--branch',GH_BRANCH,url,str(REPO_DIR)])
 
 def git_status_changes()->bool:
@@ -258,4 +247,6 @@ def create_pr(branch:str, title:str, body:str, labels:List[str], draft:bool):
     pr = r.json()
     # ラベル付与
     if labels:
-        lab_url = f
+        lab_url = (
+            f"https://api.github.com/repos/{GH_OWNER}/{GH_REPO}/issues/{pr['number']}/labels"
+        )
