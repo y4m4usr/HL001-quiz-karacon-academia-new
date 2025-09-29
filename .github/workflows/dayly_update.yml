@@ -22,6 +22,6 @@ jobs:
       
     - name: Run image download script
       env:
-        GOOGLE_CREDENTIALS: ${{ c770ff952da43ce42d4d7a90abaa3b01f247662a }}
-      run: python scripts/daily_update.pypy -3 -c "import os; print('GOOGLE_CREDENTIALS' in os.environ); print(os.environ.get('GOOGLE_CREDENTIALS'))"
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+      run: python scripts/daily_update.py
 

@@ -2,7 +2,7 @@
 const GITHUB_REPO = {
   OWNER_REPO: 'y4m4usr/HL001-quiz-karacon-academia-new',
   BRANCH: 'main',
-  LENS_IMAGE_PATH: 'images/_lensimage'
+  LENS_IMAGE_PATH: 'images/_lensing'
 };
 
 const SHEET_IDS = {
@@ -14,6 +14,7 @@ const SHEET_IDS = {
 
 const COLS = {
   MASTER: {
+    ORIGINAL_CODE: 'E', // 元品番（集計キー用）
     PRODUCT_CODE: 'G', // 品番
     BRAND: 'I',       // ブランド（カナ）
     COLOR: 'J',       // カラー（カナ）

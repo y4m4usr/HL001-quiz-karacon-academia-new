@@ -1,79 +1,170 @@
+const NORMALIZE_FOR_KEY = typeof normalizeKeyPart === 'function'
+  ? normalizeKeyPart
+  : function(value) {
+      if (value === null || value === undefined) return '';
+      return String(value).trim().toLowerCase();
+    };
 
+function buildQuestion(correctItem, allItems) {
+  if (!correctItem || !correctItem.imageAsset) return null;
 
-// ===================================================================
-// クイズロジック (問題生成、スコアリング)
-// ===================================================================
+  const distractors = pickDistractors_(correctItem, allItems);
+  if (distractors.length < 3) return null;
 
-/**
- * 正解候補と全ての候補リストから、1問分のクイズデータを生成する
- * @param {object} correctCand - 正解の候補
- * @param {Array<object>} allCandidates - 全ての候補
- * @return {object | null} 生成されたクイズデータ、または生成不可の場合はnull
- */
-function buildQuestion_(correctCand, allCandidates) {
-  const distractors = [];
-  const usedKeys = new Set([correctCand.key]); // 正解のキーを既に使用済みとして登録
-  const allCandidatesShuffled = shuffle_([...allCandidates]);
+  const qid = Utilities.getUuid();
+  const hints = correctItem.hints || { spec: '', comment: '' };
+  const thumbAsset = correctItem.thumbAsset || null;
 
-  // 誤答選択肢を3つ探す
-  // 優先順位1: カテゴリが一致し、色が似ているもの
-  for (const cand of allCandidatesShuffled) {
-    if (distractors.length >= 3) break;
-    if (usedKeys.has(cand.key)) continue; // 「ブランド｜カラー」が重複するものは除外
+  const options = shuffle([correctItem, ...distractors]).map(createOptionPayload_);
 
-    const hasIntersection = [...correctCand.cats].some(cat => cand.cats.has(cat));
-    if (!hasIntersection) continue;
+  const question = {
+    qid,
+    image: {
+      raw: (correctItem.imageAsset && correctItem.imageAsset.raw) || '',
+      cdn: (correctItem.imageAsset && correctItem.imageAsset.cdn) || null,
+    },
+    specs: {
+      dia: (correctItem.specs && correctItem.specs.dia) || '',
+      gdia: (correctItem.specs && correctItem.specs.gdia) || '',
+      bc: (correctItem.specs && correctItem.specs.bc) || '',
+    },
+    correct: {
+      key: correctItem.key,
+      label: correctItem.label,
+      thumb: thumbAsset
+        ? {
+            raw: thumbAsset.raw || '',
+            cdn: thumbAsset.cdn || null,
+          }
+        : null,
+      series: correctItem.series,
+      brand: correctItem.brand,
+      color: correctItem.color,
+      wear: correctItem.wear,
+    },
+    options,
+    hints: {
+      spec: hints.spec || '',
+      comment: hints.comment || '',
+    },
+  };
 
-    const sim = colorSim_(correctCand.color, cand.color);
-    if (sim < 0.15) continue; // 類似度の閾値
+  question.questionId = qid;
+  question.lensUrl = question.image.raw;
+  question.lensFallbackUrl = question.image.cdn || '';
+  question.thumbUrl = question.correct.thumb ? question.correct.thumb.raw || '' : '';
+  question.thumbFallbackUrl = question.correct.thumb ? question.correct.thumb.cdn || '' : '';
+  question.optionsText = options.map(opt => opt.label);
+  question.correctAnswer = question.correct.label;
+  question.hint1 = question.hints.spec;
+  question.hint2 = question.hints.comment;
 
-    distractors.push(cand.key);
-    usedKeys.add(cand.key);
-  }
+  return question;
+}
 
-  // 優先順位2: それでも足りなければ、カテゴリや色の一致を問わずランダムに補充
-  if (distractors.length < 3) {
-    for (const cand of allCandidatesShuffled) {
-      if (distractors.length >= 3) break;
-      if (usedKeys.has(cand.key)) continue; // 「ブランド｜カラー」が重複するものは除外
+function pickDistractors_(correctItem, pool) {
+  const correctTokens = toTokenSet_(correctItem.colorTokens);
+  const correctBrandKey = correctItem.brandKey || NORMALIZE_FOR_KEY(correctItem.brand);
+  const used = new Set([correctItem.key]);
 
-      distractors.push(cand.key);
-      usedKeys.add(cand.key);
+  const colorMatches = [];
+  const sameBrand = [];
+  const fallback = [];
+
+  pool.forEach(item => {
+    if (!item || used.has(item.key)) return;
+
+    const candidateTokens = toTokenSet_(item.colorTokens);
+    const candidateBrandKey = item.brandKey || NORMALIZE_FOR_KEY(item.brand);
+
+    if (hasTokenOverlap_(correctTokens, candidateTokens)) {
+      colorMatches.push(item);
+      return;
     }
+
+    if (candidateBrandKey && candidateBrandKey === correctBrandKey) {
+      sameBrand.push(item);
+      return;
+    }
+
+    fallback.push(item);
+  });
+
+  shuffle(colorMatches);
+  shuffle(sameBrand);
+  shuffle(fallback);
+
+  const results = [];
+  const pushFrom = list => {
+    for (let i = 0; i < list.length && results.length < 3; i++) {
+      const candidate = list[i];
+      if (!candidate || used.has(candidate.key)) continue;
+      results.push(candidate);
+      used.add(candidate.key);
+    }
+  };
+
+  pushFrom(colorMatches);
+  pushFrom(sameBrand);
+  pushFrom(fallback);
+
+  return results.slice(0, 3);
+}
+
+function toTokenSet_(value) {
+  if (!value) return new Set();
+  if (value instanceof Set) return value;
+  if (Array.isArray(value)) {
+    return new Set(value.map(NORMALIZE_FOR_KEY));
   }
+  return new Set([NORMALIZE_FOR_KEY(value)]);
+}
 
-  if (distractors.length < 3) return null; // 誤答が3件作れない場合は問題作成不可
+function hasTokenOverlap_(tokensA, tokensB) {
+  if (!tokensA || !tokensB) return false;
+  const setA = tokensA instanceof Set ? tokensA : toTokenSet_(tokensA);
+  const setB = tokensB instanceof Set ? tokensB : toTokenSet_(tokensB);
+  for (const token of setA) {
+    if (setB.has(token)) return true;
+  }
+  return false;
+}
 
-  const options = [correctCand.key, ...distractors];
-  shuffle_(options);
-  
-  // v1.7: フロントに返す問題オブジェクト
+function createOptionPayload_(item) {
   return {
-    questionId: Utilities.getUuid(),
-    lensUrl: correctCand.lensUrl,       // v1.7: レンズ画像URL (X列ベース)
-    thumbUrl: correctCand.thumbUrl,     // v1.7: サムネ画像URL (W列ベース) - 正解フィードバック用
-    options: options,
-    correctAnswer: correctCand.key,
-    hint1: correctCand.hint1,
-    hint2: correctCand.hint2
+    key: item.key,
+    label: item.label,
+    brand: item.brand,
+    color: item.color,
+    series: item.series,
+    wear: item.wear,
   };
 }
 
-// v1.7: スコアリングロジック (プレースホルダ)
-function calculateScore(isCorrect, hintsUsed, timeTaken) {
-  // TODO: v1.7のスコアリングロジックを実装
-  // 正解: 基本スコア
-  // 不正解: -10%
-  // ヒント1回: -3%
-  // タイムアウト: 未回答として-10%扱い
-  return 100; 
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
 }
 
-// ===================================================================
-// 内部ヘルパー関数 (QuizLogic関連)
-// ===================================================================
+function calculateScore(isCorrect, hintsUsed, timeTaken) {
+  if (!isCorrect) return 0;
 
-function shuffle_(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}
+  let hintCount = 0;
+  if (Array.isArray(hintsUsed)) {
+    hintCount = hintsUsed.filter(Boolean).length;
+  } else if (hintsUsed && typeof hintsUsed === 'object') {
+    hintCount = Object.keys(hintsUsed).filter(key => hintsUsed[key]).length;
+  }
 
-// 以下はv1.6.1から流用した色類似度判定ロジック群
-function colorSim_(a,b){const COLOR_TOKENS=['ブラウン','ライトブラウン','ダークブラウン','グレー','グレイ','ブルー','グリーン','オリーブ','ピンク','パープル','バイオレット','ヘーゼル','ブラック','ベージュ','アッシュ','レッド','オレンジ','アンバー','チャコール','ネイビー'];const na=normColor_(a),nb=normColor_(b);if(!na||!nb)return 0;const famA=COLOR_TOKENS.filter(t=>na.includes(t));const famB=COLOR_TOKENS.filter(t=>nb.includes(t));if(famA.length&&famB.length&&!famA.some(x=>famB.includes(x)))return 0;const bigramsA=new Set(getBigrams_(na));const bigramsB=new Set(getBigrams_(nb));if(!bigramsA.size||!bigramsB.size)return 0;let inter=0;bigramsA.forEach(g=>{if(bigramsB.has(g))inter++});const union=bigramsA.size+bigramsB.size-inter;return union?inter/union:0}function normColor_(s){return s_(''+s).replace(/[()[\"\\]{}!！?？・･\-\s＿_－—〜~､、，,．.\/\\]/g,'').toLowerCase()}function getBigrams_(s){const grams=[];for(let i=0;i<s.length-1;i++)grams.push(s.slice(i,i+2));return grams}
+  const hintPenalty = Math.min(hintCount * 3, 30);
+  const timePenalty = timeTaken && isFinite(timeTaken)
+    ? Math.min(Math.max(timeTaken - 20, 0) * 2, 30)
+    : 0;
+
+  return Math.max(0, 100 - hintPenalty - timePenalty);
+}
