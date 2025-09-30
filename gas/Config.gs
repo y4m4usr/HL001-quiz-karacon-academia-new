@@ -12,6 +12,19 @@ const SHEET_IDS = {
   RANKINGS: '1I2REcy2v5OpyzoY3k61kCzJ3SYKOBBCMxTLCeHWutT8',
 };
 
+const SHEET_LAYOUT = {
+  MASTER_HEADER_ROWS: 2,          // 1=タイトル等, 2=項目, 3〜データ
+  MASTER_LAST_COL_A1: 'AL',       // 評価対象の最終列（余計な空白列の影響を防ぐ）
+  CATEGORY_HEADER_ROWS: 1,        // 1=項目, 2〜データ（シートによっては2を指定）
+  CATEGORY_LAST_COL_A1: 'F'       // カテゴリシートの読込上限列
+};
+
+const MANUAL_FIX = {
+  FILE_NAME: 'manual_fix_queue.csv',
+  MIME_TYPE: MimeType.CSV,
+  DRIVE_FOLDER_ID: null // nullの場合はスクリプト同一ドライブ直下に出力
+};
+
 const COLS = {
   MASTER: {
     PRODUCT_CODE: 'E', // 元品番
