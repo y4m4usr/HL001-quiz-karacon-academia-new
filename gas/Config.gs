@@ -14,7 +14,7 @@ const SHEET_IDS = {
 
 const COLS = {
   MASTER: {
-    PRODUCT_CODE: 'G', // 品番
+    PRODUCT_CODE: 'E', // 元品番
     BRAND: 'I',       // ブランド（カナ）
     COLOR: 'J',       // カラー（カナ）
     WEAR_PERIOD: 'K', // 装用期間
