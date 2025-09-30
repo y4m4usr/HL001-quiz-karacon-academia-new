@@ -6,6 +6,7 @@
 const DATA_START_ROW = 3;
 const CATEGORY_SHEET_NAME = 'カラーカテゴリ';
 const COL_C = {SERIES: 2, COLOR: 3, CATEGORIES: 6 }; // カテゴリシートの列
+let MASTER_COLUMN_INDEXES = null;
 
 /**
  * フロントエンドから呼ばれるメイン関数 (問題取得)
@@ -69,23 +70,23 @@ function getQuestions(params) {
  */
 function buildCandidates_(masterData, catMap) {
   const candidates = [];
-  const C = COLS.MASTER;
+  const idx = getMasterColumnIndexes_();
 
   masterData.forEach((row, index) => {
     if (isEmptyRow_(row)) return; // まるごと空行は除外
     if (hasBlankCell_(row)) return; // いずれかのセルが空なら除外（絶対条件）
 
     const record = {
-      E: s_(row[colLetterToIndex_(C.PRODUCT_CODE)]),
-      I: s_(row[colLetterToIndex_(C.BRAND)]),
-      J: s_(row[colLetterToIndex_(C.COLOR)]),
-      K: s_(row[colLetterToIndex_(C.WEAR_PERIOD)]),
-      X: s_(row[colLetterToIndex_(C.LENS_URL)]),
-      W: s_(row[colLetterToIndex_(C.THUMB_URL)]),
-      P: s_(row[colLetterToIndex_(C.DIA)]),
-      Q: s_(row[colLetterToIndex_(C.GDIA)]),
-      R: s_(row[colLetterToIndex_(C.BC)]),
-      AL: s_(row[colLetterToIndex_(C.COMMENT)])
+      E: s_(row[idx.PRODUCT_CODE]),
+      I: s_(row[idx.BRAND]),
+      J: s_(row[idx.COLOR]),
+      K: s_(row[idx.WEAR_PERIOD]),
+      X: s_(row[idx.LENS_URL]),
+      W: s_(row[idx.THUMB_URL]),
+      P: s_(row[idx.DIA]),
+      Q: s_(row[idx.GDIA]),
+      R: s_(row[idx.BC]),
+      AL: s_(row[idx.COMMENT])
     };
 
     if (!record.E || !record.I || !record.J || !record.K || !record.X) return;
@@ -161,11 +162,33 @@ function buildCategoryMap_(categoryData) {
  * @returns {number} 0ベースの列インデックス
  */
 function colLetterToIndex_(col) {
+  if (typeof col !== 'string' || !col.trim()) {
+    throw new Error(`列記号が未定義です: ${col}`);
+  }
+  const normalized = col.trim().toUpperCase();
   let index = 0;
-  for (let i = 0; i < col.length; i++) {
-    index = index * 26 + (col.charCodeAt(i) - 64);
+  for (let i = 0; i < normalized.length; i++) {
+    index = index * 26 + (normalized.charCodeAt(i) - 64);
   }
   return index - 1;
+}
+
+function getMasterColumnIndexes_() {
+  if (MASTER_COLUMN_INDEXES) return MASTER_COLUMN_INDEXES;
+  if (typeof COLS === 'undefined' || !COLS || !COLS.MASTER) {
+    throw new Error('COLS.MASTER が未定義です。Config.gs の設定を確認してください。');
+  }
+
+  const map = {};
+  Object.entries(COLS.MASTER).forEach(([key, letter]) => {
+    if (typeof letter !== 'string' || !letter.trim()) {
+      throw new Error(`COLS.MASTER.${key} が未設定です。Config.gs を確認してください。`);
+    }
+    map[key] = colLetterToIndex_(letter);
+  });
+
+  MASTER_COLUMN_INDEXES = map;
+  return MASTER_COLUMN_INDEXES;
 }
 
 function colIndexToLetter_(index){
@@ -235,7 +258,7 @@ function debugDataProcessing() {
     const categoryData = shC.getRange(DATA_START_ROW, 1, shC.getLastRow() - DATA_START_ROW + 1, shC.getLastColumn()).getValues();
 
     const catMap = buildCategoryMap_(categoryData);
-    const C = COLS.MASTER;
+    const idx = getMasterColumnIndexes_();
 
     const totalMasterRows = masterData.length;
     let excludedEmptyRows = 0;
@@ -276,11 +299,11 @@ function debugDataProcessing() {
       }
 
       const record = {
-        E: s_(row[colLetterToIndex_(C.PRODUCT_CODE)]),
-        I: s_(row[colLetterToIndex_(C.BRAND)]),
-        J: s_(row[colLetterToIndex_(C.COLOR)]),
-        K: s_(row[colLetterToIndex_(C.WEAR_PERIOD)]),
-        X: s_(row[colLetterToIndex_(C.LENS_URL)])
+        E: s_(row[idx.PRODUCT_CODE]),
+        I: s_(row[idx.BRAND]),
+        J: s_(row[idx.COLOR]),
+        K: s_(row[idx.WEAR_PERIOD]),
+        X: s_(row[idx.LENS_URL])
       };
 
       const missing = [];
