@@ -155,23 +155,6 @@ function evaluateMasterRows_(masterData, dataStartRow, catMap) {
       return;
     }
 
-    const firstBlankIndex = findFirstBlankCellIndex_(row);
-    if (firstBlankIndex >= 0) {
-      summary.excludedBlankCells++;
-      const colLetter = colIndexToLetter_(firstBlankIndex);
-      if (samples.blankCells.length < 5) {
-        samples.blankCells.push(`masterシート ${rowNumber}行目: 列${colLetter} が空のため除外`);
-      }
-      pushManualFix_(manualFix, {
-        sheet: 'master',
-        row: rowNumber,
-        keyParts: [],
-        reason: 'blank_cell',
-        detail: `列${colLetter} が空です`
-      });
-      return;
-    }
-
     const record = {
       E: s_(row[idx.PRODUCT_CODE]),
       I: s_(row[idx.BRAND]),
@@ -338,13 +321,6 @@ function hasBlankCell_(row){
  */
 function isEmptyRow_(row){
   return row.every(cell=>s_(cell)==='');
-}
-
-function findFirstBlankCellIndex_(row){
-  for(let i=0;i<row.length;i++){
-    if(s_(row[i])==='') return i;
-  }
-  return -1;
 }
 
 /**
