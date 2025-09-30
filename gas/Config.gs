@@ -2,7 +2,8 @@
 const GITHUB_REPO = {
   OWNER_REPO: 'y4m4usr/HL001-quiz-karacon-academia-new',
   BRANCH: 'main',
-  LENS_IMAGE_PATH: 'images/_lensimage'
+  LENS_IMAGE_PATH: 'imagesnew1/lens/lens1',
+  SAMUNE_IMAGE_PATH: 'imagesnew1/samune/samune1'
 };
 
 const SHEET_IDS = {
