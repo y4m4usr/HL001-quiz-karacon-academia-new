@@ -89,12 +89,8 @@ function buildCandidates_(masterData, catMap) {
       AL: s_(row[idx.COMMENT])
     };
 
-    if (!record.E || !record.I || !record.J || !record.K) return;
-
-    const lensUrl = resolveLensUrl_(record);
-    if (!lensUrl) return;
-
-    const thumbUrl = resolveThumbUrl_(record);
+    if (!record.E || !record.I || !record.J || !record.K || !record.X) return;
+    if (!isValidHttpUrl_(record.X)) return; // X列は有効なURLである必要がある
 
     const catKey = `${record.I}|${record.J}`;
     const colorWords = catMap.get(catKey);
@@ -107,8 +103,8 @@ function buildCandidates_(masterData, catMap) {
       brand: record.I,
       color: record.J,
       wearPeriod: record.K,
-      lensUrl: lensUrl,
-      thumbUrl: thumbUrl,
+      lensUrl: record.X,
+      thumbUrl: isValidHttpUrl_(record.W) ? record.W : '',
       colorWords: new Set(colorWords),
       label: `${record.I} / ${record.J}`,
       dia: record.P,
@@ -204,32 +200,6 @@ function colIndexToLetter_(index){
     n=Math.floor((n-1)/26);
   }
   return result;
-}
-
-function resolveLensUrl_(record){
-  if(!record) return '';
-  if(isValidHttpUrl_(record.X)) return record.X;
-  return buildGitHubImageUrl_(record,'lens');
-}
-
-function resolveThumbUrl_(record){
-  if(!record) return '';
-  if(isValidHttpUrl_(record.W)) return record.W;
-  return buildGitHubImageUrl_(record,'samune');
-}
-
-function buildGitHubImageUrl_(record,type){
-  if(!record) return '';
-  if(!GITHUB_REPO||!GITHUB_REPO.OWNER_REPO||!GITHUB_REPO.BRANCH) return '';
-  const basePath=type==='samune'?GITHUB_REPO.SAMUNE_IMAGE_PATH:GITHUB_REPO.LENS_IMAGE_PATH;
-  if(!basePath) return '';
-  const suffix=type==='samune'?'samune':'lens';
-  const parts=[record.E,record.I,record.J,record.K,suffix];
-  if(parts.some(p=>!p)) return '';
-  const filename=parts.join('_')+'.jpg';
-  const encoded=encodeURIComponent(filename);
-  const url=`https://raw.githubusercontent.com/${GITHUB_REPO.OWNER_REPO}/${GITHUB_REPO.BRANCH}/${basePath}/${encoded}`;
-  return isValidHttpUrl_(url)?url:'';
 }
 
 /**
@@ -341,6 +311,7 @@ function debugDataProcessing() {
       if (!record.I) missing.push('I');
       if (!record.J) missing.push('J');
       if (!record.K) missing.push('K');
+      if (!record.X) missing.push('X');
 
       if (missing.length) {
         excludedMissingRequired++;
@@ -350,11 +321,10 @@ function debugDataProcessing() {
         return;
       }
 
-      const resolvedLensUrl = resolveLensUrl_(record);
-      if (!resolvedLensUrl) {
+      if (!isValidHttpUrl_(record.X)) {
         excludedInvalidLensUrl++;
         if (samples.invalidLensUrl.length < 5) {
-          samples.invalidLensUrl.push(`masterシート ${rowNumber}行目: レンズ画像をGitHubパスから解決できません (E:${record.E}, I:${record.I}, J:${record.J}, K:${record.K})`);
+          samples.invalidLensUrl.push(`masterシート ${rowNumber}行目: レンズURLが不正です (${record.X})`);
         }
         return;
       }
