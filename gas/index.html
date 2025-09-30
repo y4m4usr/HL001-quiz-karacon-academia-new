@@ -222,7 +222,7 @@ const App = (() => {
     // 状態管理
     const state = {
         currentUser: null, questions: [], currentQuestionIndex: 0,
-        selectedAnswer: null, timer: null, timeLeft: 20,
+        selectedAnswer: null, selectedAnswerLabel: null, timer: null, timeLeft: 20,
         hintsUsed: { h1: false, h2: false }, gameMode: 'practice',
         answers: [] // 回答履歴を保存する配列を追加
     };
@@ -371,6 +371,7 @@ const App = (() => {
         UI.currentQuestionNum.textContent = state.currentQuestionIndex + 1;
         UI.progressFill.style.width = `${(state.currentQuestionIndex + 1) * 10}%`;
         state.selectedAnswer = null; // 選択をリセット
+        state.selectedAnswerLabel = null;
 
         // ★ 修正: プロキシ経経由でレンズ画像(lensUrl)を設定する
         setImageWithProxy(UI.leftLens, q.lensUrl);
@@ -380,8 +381,9 @@ const App = (() => {
         q.options.forEach(opt => {
             const div = document.createElement('div');
             div.className = 'answer-option';
-            div.innerHTML = `<div class="answer-radio"></div><div>${opt}</div>`; // ラジオボタン風UIを追加
-            div.dataset.answer = opt;
+            div.innerHTML = `<div class="answer-radio"></div><div>${opt.label}</div>`;
+            div.dataset.answerId = opt.id;
+            div.dataset.answerLabel = opt.label;
             div.onclick = () => selectOption(div);
             UI.answerOptions.appendChild(div);
         });
@@ -392,7 +394,8 @@ const App = (() => {
     function selectOption(el) {
         document.querySelectorAll('.answer-option').forEach(opt => opt.classList.remove('selected'));
         el.classList.add('selected');
-        state.selectedAnswer = el.dataset.answer;
+        state.selectedAnswer = el.dataset.answerId;
+        state.selectedAnswerLabel = el.dataset.answerLabel;
     }
     // タイマー
     function startTimer() {
@@ -412,15 +415,17 @@ const App = (() => {
         if (state.selectedAnswer === null && !isTimeout) return; // タイムアウト以外では未選択で送信不可
         clearInterval(state.timer);
         const q = state.questions[state.currentQuestionIndex];
-        const isCorrect = state.selectedAnswer === q.correctAnswer;
+        const isCorrect = state.selectedAnswer === q.correctAnswerKey;
 
         state.answers.push({
             selected: state.selectedAnswer,
-            correct: q.correctAnswer,
+            selectedLabel: state.selectedAnswerLabel,
+            correct: q.correctAnswerKey,
+            correctLabel: q.correctAnswerLabel,
             isCorrect: isCorrect
         });
 
-        showFeedback(isCorrect, q.correctAnswer);
+        showFeedback(isCorrect, q.correctAnswerLabel);
         setTimeout(() => {
             UI.feedbackOverlay.classList.add('hidden');
             state.currentQuestionIndex++;
@@ -428,7 +433,7 @@ const App = (() => {
         }, CONSTANTS.FEEDBACK_DISPLAY_MS);
     }
     // フィードバック
-    function showFeedback(isCorrect, correctAnswer) {
+    function showFeedback(isCorrect, correctAnswerLabel) {
         const q = state.questions[state.currentQuestionIndex];
         UI.feedbackCard.className = 'feedback-card';
         UI.feedbackImage.style.display = 'none'; // いったん隠す
@@ -437,7 +442,7 @@ const App = (() => {
             UI.feedbackCard.classList.add('feedback-correct');
             UI.feedbackIcon.textContent = '🎉';
             UI.feedbackTitle.textContent = '正解！';
-            UI.feedbackMessage.textContent = correctAnswer;
+            UI.feedbackMessage.textContent = correctAnswerLabel;
             // v1.7: 正解時にサムネイル画像を表示
             if (q.thumbUrl) {
                 UI.feedbackImage.style.display = 'block';
@@ -447,7 +452,7 @@ const App = (() => {
             UI.feedbackCard.classList.add('feedback-incorrect');
             UI.feedbackIcon.textContent = '❌';
             UI.feedbackTitle.textContent = '不正解...';
-            UI.feedbackMessage.textContent = `正解は: ${correctAnswer}`;
+            UI.feedbackMessage.textContent = `正解は: ${correctAnswerLabel}`;
         }
         UI.feedbackOverlay.classList.remove('hidden');
     }

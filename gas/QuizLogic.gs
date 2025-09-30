@@ -11,51 +11,26 @@
  * @return {object | null} 生成されたクイズデータ、または生成不可の場合はnull
  */
 function buildQuestion_(correctCand, allCandidates) {
-  const distractors = [];
-  const usedKeys = new Set([correctCand.key]); // 正解のキーを既に使用済みとして登録
-  const allCandidatesShuffled = shuffle_([...allCandidates]);
+  const wrongs = pickWrongAnswers_(correctCand, allCandidates, 3);
+  if (wrongs.length < 3) return null; // 誤答が3件確保できなければ問題を生成しない
 
-  // 誤答選択肢を3つ探す
-  // 優先順位1: カテゴリが一致し、色が似ているもの
-  for (const cand of allCandidatesShuffled) {
-    if (distractors.length >= 3) break;
-    if (usedKeys.has(cand.key)) continue; // 「ブランド｜カラー」が重複するものは除外
+  const options = [
+    createOption_(correctCand, true),
+    ...wrongs.map(w => createOption_(w, false))
+  ];
 
-    const hasIntersection = [...correctCand.cats].some(cat => cand.cats.has(cat));
-    if (!hasIntersection) continue;
-
-    const sim = colorSim_(correctCand.color, cand.color);
-    if (sim < 0.15) continue; // 類似度の閾値
-
-    distractors.push(cand.key);
-    usedKeys.add(cand.key);
-  }
-
-  // 優先順位2: それでも足りなければ、カテゴリや色の一致を問わずランダムに補充
-  if (distractors.length < 3) {
-    for (const cand of allCandidatesShuffled) {
-      if (distractors.length >= 3) break;
-      if (usedKeys.has(cand.key)) continue; // 「ブランド｜カラー」が重複するものは除外
-
-      distractors.push(cand.key);
-      usedKeys.add(cand.key);
-    }
-  }
-
-  if (distractors.length < 3) return null; // 誤答が3件作れない場合は問題作成不可
-
-  const options = [correctCand.key, ...distractors];
   shuffle_(options);
-  
-  // v1.7: フロントに返す問題オブジェクト
+
   return {
-    questionId: Utilities.getUuid(),
-    lensUrl: correctCand.lensUrl,       // v1.7: レンズ画像URL (X列ベース)
-    thumbUrl: correctCand.thumbUrl,     // v1.7: サムネ画像URL (W列ベース) - 正解フィードバック用
+    questionId: `CK:${correctCand.key}`,
+    lensUrl: correctCand.lensUrl,
+    thumbUrl: correctCand.thumbUrl,
     options: options,
-    correctAnswer: correctCand.key,
+    correctAnswerKey: correctCand.key,
+    correctAnswerLabel: correctCand.label,
     hint1: correctCand.hint1,
-    hint2: correctCand.hint2
+    hint2: correctCand.hint2,
+    specs: correctCand.specs || null
   };
 }
 
@@ -75,5 +50,59 @@ function calculateScore(isCorrect, hintsUsed, timeTaken) {
 
 function shuffle_(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}
 
-// 以下はv1.6.1から流用した色類似度判定ロジック群
-function colorSim_(a,b){const COLOR_TOKENS=['ブラウン','ライトブラウン','ダークブラウン','グレー','グレイ','ブルー','グリーン','オリーブ','ピンク','パープル','バイオレット','ヘーゼル','ブラック','ベージュ','アッシュ','レッド','オレンジ','アンバー','チャコール','ネイビー'];const na=normColor_(a),nb=normColor_(b);if(!na||!nb)return 0;const famA=COLOR_TOKENS.filter(t=>na.includes(t));const famB=COLOR_TOKENS.filter(t=>nb.includes(t));if(famA.length&&famB.length&&!famA.some(x=>famB.includes(x)))return 0;const bigramsA=new Set(getBigrams_(na));const bigramsB=new Set(getBigrams_(nb));if(!bigramsA.size||!bigramsB.size)return 0;let inter=0;bigramsA.forEach(g=>{if(bigramsB.has(g))inter++});const union=bigramsA.size+bigramsB.size-inter;return union?inter/union:0}function normColor_(s){return s_(''+s).replace(/[()[\"\\]{}!！?？・･\-\s＿_－—〜~､、，,．.\/\\]/g,'').toLowerCase()}function getBigrams_(s){const grams=[];for(let i=0;i<s.length-1;i++)grams.push(s.slice(i,i+2));return grams}
+/**
+ * 誤答候補を仕様に沿って抽出する
+ * @param {object} correct
+ * @param {Array<object>} pool
+ * @param {number} n
+ * @return {Array<object>}
+ */
+function pickWrongAnswers_(correct, pool, n){
+  const picked=[];
+  const usedKeys=new Set([correct.key]);
+  const usedLabels=new Set([correct.label]);
+  const colorWords=correct.colorWords||new Set();
+
+  const others=pool.filter(c=>c.key!==correct.key);
+
+  const takeFrom=(source)=>{
+    for(const cand of source){
+      if(picked.length>=n) break;
+      if(usedKeys.has(cand.key)) continue;
+      if(usedLabels.has(cand.label)) continue;
+      picked.push(cand);
+      usedKeys.add(cand.key);
+      usedLabels.add(cand.label);
+    }
+  };
+
+  const sameCategory=shuffle_(others.filter(c=>hasColorOverlap_(colorWords,c.colorWords)));
+  takeFrom(sameCategory);
+
+  if(picked.length<n){
+    const sameBrand=shuffle_(others.filter(c=>c.brand===correct.brand && c.color!==correct.color));
+    takeFrom(sameBrand);
+  }
+
+  if(picked.length<n){
+    takeFrom(shuffle_([...others]));
+  }
+
+  return picked.slice(0,n);
+}
+
+function hasColorOverlap_(a,b){
+  if(!a||!b||a.size===0||b.size===0) return false;
+  for(const word of a){
+    if(b.has(word)) return true;
+  }
+  return false;
+}
+
+function createOption_(candidate,isCorrect){
+  return {
+    id: candidate.key,
+    label: candidate.label,
+    isCorrect: isCorrect
+  };
+}

@@ -31,7 +31,7 @@ function getQuestions(params) {
     // v1.7 堅牢化: 候補リストの総数と、ユニークなキーの数をチェックする
     const uniqueKeys = new Set(candidates.map(c => c.key));
     Logger.log(`有効な候補データの総数: ${candidates.length}件`);
-    Logger.log(`ユニークな「ブランド｜カラー」の組み合わせ数: ${uniqueKeys.size}件`);
+    Logger.log(`ユニークな「E|I|J|K」キーの件数: ${uniqueKeys.size}件`);
 
     if (uniqueKeys.size < 4) {
       // 正解1件＋不正解3件のユニークな組み合わせが作れないため、ここでエラーとする
@@ -62,66 +62,93 @@ function getQuestions(params) {
 }
 
 /**
- * v1.7: 候補リストを作成する際に、画像URLを動的に生成する
+ * マスターデータからクイズ候補を生成する
  * @param {Array<Array<any>>} masterData - マスタシートの全データ
- * @param {Map<string, object>} catMap - カテゴリデータ
+ * @param {Map<string, Set<string>>} catMap - ブランド/カラーごとの色カテゴリ集合
  * @return {Array<object>} 候補オブジェクトの配列
  */
 function buildCandidates_(masterData, catMap) {
   const candidates = [];
-  const C = COLS.MASTER; // Config.gsから
+  const C = COLS.MASTER;
 
-  masterData.forEach(row => {
-    const brand = s_(row[colLetterToIndex_(C.BRAND)]);
-    const color = s_(row[colLetterToIndex_(C.COLOR)]);
-    const lensUrlFromSheet = s_(row[colLetterToIndex_(C.LENS_URL)]);
+  masterData.forEach((row, index) => {
+    if (isEmptyRow_(row)) return; // まるごと空行は除外
+    if (hasBlankCell_(row)) return; // いずれかのセルが空なら除外（絶対条件）
 
-    // v1.7: データ完備の商品のみを出題対象とする
-    if (!brand || !color || !lensUrlFromSheet) return; 
+    const record = {
+      E: s_(row[colLetterToIndex_(C.PRODUCT_CODE)]),
+      I: s_(row[colLetterToIndex_(C.BRAND)]),
+      J: s_(row[colLetterToIndex_(C.COLOR)]),
+      K: s_(row[colLetterToIndex_(C.WEAR_PERIOD)]),
+      X: s_(row[colLetterToIndex_(C.LENS_URL)]),
+      W: s_(row[colLetterToIndex_(C.THUMB_URL)]),
+      P: s_(row[colLetterToIndex_(C.DIA)]),
+      Q: s_(row[colLetterToIndex_(C.GDIA)]),
+      R: s_(row[colLetterToIndex_(C.BC)]),
+      AL: s_(row[colLetterToIndex_(C.COMMENT)])
+    };
 
-    const key = `${brand}｜${color}`;
-    if (!catMap.has(key)) return;
+    if (!record.E || !record.I || !record.J || !record.K || !record.X) return;
+    if (!isValidHttpUrl_(record.X)) return; // X列は有効なURLである必要がある
 
-    const productCode = s_(row[colLetterToIndex_(C.PRODUCT_CODE)]);
-    const wearPeriod = s_(row[colLetterToIndex_(C.WEAR_PERIOD)]);
-
-    // v1.7: 新しい命名規則でファイル名を生成
-    const imageName = `${productCode}_${sanitizeForUrl_(brand)}_${sanitizeForUrl_(color)}_${sanitizeForUrl_(wearPeriod)}_lens.jpg`;
-    const githubUrl = `https://raw.githubusercontent.com/${GITHUB_REPO.OWNER_REPO}/${GITHUB_REPO.BRANCH}/${GITHUB_REPO.LENS_IMAGE_PATH}/${imageName}`;
+    const catKey = `${record.I}|${record.J}`;
+    const colorWords = catMap.get(catKey);
+    if (!colorWords || colorWords.size === 0) return; // カテゴリ未定義は除外
 
     candidates.push({
-      key: key,
-      brand: brand,
-      color: color,
-      lensUrl: githubUrl, // v1.7: 動的に生成したレンズ画像URL
-      thumbUrl: s_(row[colLetterToIndex_(C.THUMB_URL)]), // v1.7: サムネURLはW列をそのまま使用
-      cats: catMap.get(key).cats,
-      hint1: `DIA:${s_(row[colLetterToIndex_(C.DIA)])} / G.DIA:${s_(row[colLetterToIndex_(C.GDIA)])} / BC:${s_(row[colLetterToIndex_(C.BC)])}`,
-      hint2: s_(row[colLetterToIndex_(C.COMMENT)])
+      key: `${record.E}|${record.I}|${record.J}|${record.K}`,
+      categoryKey: catKey,
+      itemCode: record.E,
+      brand: record.I,
+      color: record.J,
+      wearPeriod: record.K,
+      lensUrl: record.X,
+      thumbUrl: isValidHttpUrl_(record.W) ? record.W : '',
+      colorWords: new Set(colorWords),
+      label: `${record.I} / ${record.J}`,
+      dia: record.P,
+      gDia: record.Q,
+      bc: record.R,
+      comment: record.AL,
+      hint1: `DIA:${record.P} / G.DIA:${record.Q} / BC:${record.R}`,
+      hint2: record.AL,
+      specs: { DIA: record.P, G_DIA: record.Q, BC: record.R },
+      rowIndex: index + DATA_START_ROW
     });
   });
+
   return candidates;
 }
 
 /**
- * カテゴリシートのデータから、検索用のMapを生成する
+ * カテゴリシートのデータから、ブランド/カラー→色カテゴリ集合のMapを生成する
+ * @param {Array<Array<any>>} categoryData
+ * @return {Map<string, Set<string>>}
  */
-function buildCategoryMap_(categoryData){
-  const catMap=new Map();
-  categoryData.forEach(row=>{
-    const series=s_(row[COL_C.SERIES-1]);
-    const color=s_(row[COL_C.COLOR-1]);
-    if(!series||!color)return;
-    const key=`${series}｜${color}`;
-    const cats=new Set(s_(row[COL_C.CATEGORIES-1]).split(/[、,\/\s]+/));
-    if(catMap.has(key)){
-      const existing=catMap.get(key);
-      cats.forEach(c=>existing.cats.add(c))
-    }else{
-      catMap.set(key,{series,color,cats})
+function buildCategoryMap_(categoryData) {
+  const catMap = new Map();
+
+  categoryData.forEach(row => {
+    const brand = s_(row[COL_C.SERIES - 1]);
+    const color = s_(row[COL_C.COLOR - 1]);
+    const rawCats = s_(row[COL_C.CATEGORIES - 1]);
+
+    if (!brand || !color || !rawCats) return; // B/C/F のいずれかが空なら除外
+
+    const key = `${brand}|${color}`;
+    const set = catMap.get(key) || new Set();
+
+    rawCats.split(/[，,、／/・\s]+/).forEach(token => {
+      const normalized = token.trim();
+      if (normalized) set.add(normalized);
+    });
+
+    if (set.size > 0) {
+      catMap.set(key, set);
     }
   });
-  return catMap
+
+  return catMap;
 }
 
 // ===================================================================
@@ -141,18 +168,54 @@ function colLetterToIndex_(col) {
   return index - 1;
 }
 
-/**
- * Pythonのsanitize_filenameと互換性のあるファイル名サニタイズ関数
- */
-function sanitizeForUrl_(name) {
-  if (!name) return '';
-  return name.replace(/　/g, ' ').replace(/[\\/:*?"<>|]/g, '_');
+function colIndexToLetter_(index){
+  let n=index+1;
+  let result='';
+  while(n>0){
+    const rem=(n-1)%26;
+    result=String.fromCharCode(65+rem)+result;
+    n=Math.floor((n-1)/26);
+  }
+  return result;
 }
 
 /**
  * 値をトリムして文字列に変換する
  */
 function s_(v){return(v===null||v===undefined)?'':String(v).trim()}
+
+/**
+ * 行内に空セルが含まれているかを判定する
+ * @param {Array<any>} row
+ * @return {boolean}
+ */
+function hasBlankCell_(row){
+  return row.some(cell=>s_(cell)==='');
+}
+
+/**
+ * 行全体が空かを判定する
+ * @param {Array<any>} row
+ * @return {boolean}
+ */
+function isEmptyRow_(row){
+  return row.every(cell=>s_(cell)==='');
+}
+
+/**
+ * HTTP/HTTPSのURLかどうかを判定する
+ * @param {string} value
+ * @return {boolean}
+ */
+function isValidHttpUrl_(value){
+  if(!value) return false;
+  try{
+    const url=new URL(value);
+    return url.protocol==='https:'||url.protocol==='http:';
+  }catch(e){
+    return false;
+  }
+}
 
 /**
  * ===================================================================
@@ -168,54 +231,108 @@ function debugDataProcessing() {
     if (!shM) return { error: '「master」シートが見つかりません。' };
     if (!shC) return { error: `「${CATEGORY_SHEET_NAME}」シートが見つかりません。` };
 
-    const masterData = shM.getRange(3, 1, shM.getLastRow() - 2, shM.getLastColumn()).getValues();
-    const categoryData = shC.getRange(3, 1, shC.getLastRow() - 2, shC.getLastColumn()).getValues();
-    
-    const catMap = buildCategoryMap_(categoryData);
+    const masterData = shM.getRange(DATA_START_ROW, 1, shM.getLastRow() - DATA_START_ROW + 1, shM.getLastColumn()).getValues();
+    const categoryData = shC.getRange(DATA_START_ROW, 1, shC.getLastRow() - DATA_START_ROW + 1, shC.getLastColumn()).getValues();
 
+    const catMap = buildCategoryMap_(categoryData);
     const C = COLS.MASTER;
 
-    let totalMasterRows = masterData.length;
-    let passedFieldCheck = 0;
-    let passedCategoryCheck = 0;
+    const totalMasterRows = masterData.length;
+    let excludedEmptyRows = 0;
+    let excludedBlankCells = 0;
+    let excludedMissingRequired = 0;
+    let excludedInvalidLensUrl = 0;
+    let excludedMissingCategory = 0;
+
+    const samples = {
+      emptyRows: [],
+      blankCells: [],
+      missingRequired: [],
+      invalidLensUrl: [],
+      missingCategory: []
+    };
+
     const validCandidateKeys = new Set();
-    
-    const discardedForFields = [];
-    const discardedForCategory = [];
 
     masterData.forEach((row, index) => {
-      const brand = s_(row[colLetterToIndex_(C.BRAND)]);
-      const color = s_(row[colLetterToIndex_(C.COLOR)]);
-      const lensUrlFromSheet = s_(row[colLetterToIndex_(C.LENS_URL)]);
+      const rowNumber = index + DATA_START_ROW;
 
-      if (!brand || !color || !lensUrlFromSheet) {
-        if (discardedForFields.length < 5) { // 最初の5件をサンプルとして記録
-          discardedForFields.push(`masterシートの ${index + 3}行目: 必須項目が空です (ブランド: '${brand}', カラー: '${color}', レンズURL: '${lensUrlFromSheet}')`);
+      if (isEmptyRow_(row)) {
+        excludedEmptyRows++;
+        if (samples.emptyRows.length < 5) {
+          samples.emptyRows.push(`masterシート ${rowNumber}行目: 空行のため除外`);
         }
         return;
       }
-      passedFieldCheck++;
 
-      const key = `${brand}｜${color}`;
-      if (!catMap.has(key)) {
-        if (discardedForCategory.length < 5) { // 最初の5件をサンプルとして記録
-          discardedForCategory.push(`masterシートの ${index + 3}行目: キー「${key}」がカラーカテゴリシートに存在しません。`);
+      const firstBlankIndex = row.findIndex(cell => s_(cell) === '');
+      if (firstBlankIndex >= 0) {
+        excludedBlankCells++;
+        if (samples.blankCells.length < 5) {
+          const colLetter = colIndexToLetter_(firstBlankIndex);
+          samples.blankCells.push(`masterシート ${rowNumber}行目: 列${colLetter} が空のため除外`);
         }
         return;
       }
-      passedCategoryCheck++;
-      validCandidateKeys.add(key);
+
+      const record = {
+        E: s_(row[colLetterToIndex_(C.PRODUCT_CODE)]),
+        I: s_(row[colLetterToIndex_(C.BRAND)]),
+        J: s_(row[colLetterToIndex_(C.COLOR)]),
+        K: s_(row[colLetterToIndex_(C.WEAR_PERIOD)]),
+        X: s_(row[colLetterToIndex_(C.LENS_URL)])
+      };
+
+      const missing = [];
+      if (!record.E) missing.push('E');
+      if (!record.I) missing.push('I');
+      if (!record.J) missing.push('J');
+      if (!record.K) missing.push('K');
+      if (!record.X) missing.push('X');
+
+      if (missing.length) {
+        excludedMissingRequired++;
+        if (samples.missingRequired.length < 5) {
+          samples.missingRequired.push(`masterシート ${rowNumber}行目: 必須列(${missing.join(',')})が空です。`);
+        }
+        return;
+      }
+
+      if (!isValidHttpUrl_(record.X)) {
+        excludedInvalidLensUrl++;
+        if (samples.invalidLensUrl.length < 5) {
+          samples.invalidLensUrl.push(`masterシート ${rowNumber}行目: レンズURLが不正です (${record.X})`);
+        }
+        return;
+      }
+
+      const catKey = `${record.I}|${record.J}`;
+      const colorWords = catMap.get(catKey);
+      if (!colorWords || colorWords.size === 0) {
+        excludedMissingCategory++;
+        if (samples.missingCategory.length < 5) {
+          samples.missingCategory.push(`masterシート ${rowNumber}行目: カテゴリ未登録 (キー: ${catKey})`);
+        }
+        return;
+      }
+
+      validCandidateKeys.add(`${record.E}|${record.I}|${record.J}|${record.K}`);
     });
 
     return {
-      step1_totalMasterRows: totalMasterRows,
-      step2_passedFieldCheck: passedFieldCheck,
-      step3_passedCategoryCheck: passedCategoryCheck,
-      step4_finalUniqueCandidates: validCandidateKeys.size,
-      info_discardedForFields_count: totalMasterRows - passedFieldCheck,
-      info_discardedForCategory_count: passedFieldCheck - passedCategoryCheck,
-      debug_examples_discardedForFields: discardedForFields,
-      debug_examples_discardedForCategory: discardedForCategory,
+      total_master_rows: totalMasterRows,
+      category_map_entries: catMap.size,
+      excluded_empty_rows: excludedEmptyRows,
+      excluded_blank_cells: excludedBlankCells,
+      excluded_missing_required: excludedMissingRequired,
+      excluded_invalid_lens_url: excludedInvalidLensUrl,
+      excluded_missing_category: excludedMissingCategory,
+      final_unique_candidates: validCandidateKeys.size,
+      debug_examples_empty_rows: samples.emptyRows,
+      debug_examples_blank_cells: samples.blankCells,
+      debug_examples_missing_required: samples.missingRequired,
+      debug_examples_invalid_lens_url: samples.invalidLensUrl,
+      debug_examples_missing_category: samples.missingCategory
     };
   } catch (e) {
     return { error: 'デバッグ処理中に予期せぬエラーが発生しました: ' + e.message, stack: e.stack };
