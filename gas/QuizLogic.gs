@@ -48,7 +48,16 @@ function calculateScore(isCorrect, hintsUsed, timeTaken) {
 // 内部ヘルパー関数 (QuizLogic関連)
 // ===================================================================
 
-function shuffle_(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}
+function shuffle_(arr){
+  if(!Array.isArray(arr)){
+    throw new Error(`shuffle_ は配列を期待しましたが、${Object.prototype.toString.call(arr)} が渡されました。`);
+  }
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
 
 /**
  * 誤答候補を仕様に沿って抽出する
@@ -58,10 +67,16 @@ function shuffle_(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.r
  * @return {Array<object>}
  */
 function pickWrongAnswers_(correct, pool, n){
+  if(!correct || typeof correct !== 'object'){
+    throw new Error('pickWrongAnswers_: 正解オブジェクトが不正です。');
+  }
+  if(!Array.isArray(pool)){
+    throw new Error('pickWrongAnswers_: 候補リストが配列ではありません。');
+  }
   const picked=[];
   const usedKeys=new Set([correct.key]);
   const usedLabels=new Set([correct.label]);
-  const colorWords=correct.colorWords||new Set();
+  const colorWords=normalizeColorSet_(correct.colorWords);
 
   const others=pool.filter(c=>c.key!==correct.key);
 
@@ -76,7 +91,7 @@ function pickWrongAnswers_(correct, pool, n){
     }
   };
 
-  const sameCategory=shuffle_(others.filter(c=>hasColorOverlap_(colorWords,c.colorWords)));
+  const sameCategory=shuffle_(others.filter(c=>hasColorOverlap_(colorWords,normalizeColorSet_(c.colorWords))));
   takeFrom(sameCategory);
 
   if(picked.length<n){
@@ -89,6 +104,13 @@ function pickWrongAnswers_(correct, pool, n){
   }
 
   return picked.slice(0,n);
+}
+
+function normalizeColorSet_(value){
+  if(value instanceof Set) return value;
+  if(Array.isArray(value)) return new Set(value);
+  if(typeof value==='string' && value.trim()) return new Set([value.trim()]);
+  return new Set();
 }
 
 function hasColorOverlap_(a,b){
