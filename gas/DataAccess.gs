@@ -44,7 +44,7 @@ function getQuestions(params) {
     const evaluation = evaluateMasterRows_(masterData, masterDataStartRow, catMap);
     const candidates = evaluation.candidates;
 
-    writeManualFixQueue_(evaluation.manualFix);
+    writeManualFixQueue_(evaluation.manualFix, ss);
 
     // v1.7 堅牢化: 候補リストの総数と、ユニークなキーの数をチェックする
     const uniqueKeys = new Set(candidates.map(c => c.key));
@@ -125,14 +125,17 @@ function evaluateMasterRows_(masterData, dataStartRow, catMap) {
   const idx = getMasterColumnIndexes_();
   const candidates = [];
   const manualFix = [];
+  const strictBlankCheck = isStrictBlankCheckEnabled_();
 
   const summary = {
     totalMasterRows: masterData.length,
+    nonEmptyRows: 0,
     excludedEmptyRows: 0,
     excludedBlankCells: 0,
     excludedMissingRequired: 0,
     excludedInvalidLensUrl: 0,
     excludedMissingCategory: 0,
+    requiredMissingByColumn: { E: 0, I: 0, J: 0, K: 0, X: 0 },
     validCandidateKeys: new Set()
   };
 
@@ -155,6 +158,8 @@ function evaluateMasterRows_(masterData, dataStartRow, catMap) {
       return;
     }
 
+    summary.nonEmptyRows++;
+
     const record = {
       E: s_(row[idx.PRODUCT_CODE]),
       I: s_(row[idx.BRAND]),
@@ -168,6 +173,23 @@ function evaluateMasterRows_(masterData, dataStartRow, catMap) {
       AL: s_(row[idx.COMMENT])
     };
 
+    if (strictBlankCheck && hasBlankCell_(row)) {
+      summary.excludedBlankCells++;
+      const blankCols = getBlankColumnLetters_(row).slice(0, 10);
+      if (samples.blankCells.length < 5) {
+        const reportCols = blankCols.length ? blankCols.join(',') : 'N/A';
+        samples.blankCells.push(`master sheet ${rowNumber}: blank cells (${reportCols}) remain`);
+      }
+      pushManualFix_(manualFix, {
+        sheet: 'master',
+        row: rowNumber,
+        keyParts: [record.E, record.I, record.J, record.K],
+        reason: 'blank_cells',
+        detail: blankCols.length ? `blank cells (${blankCols.join(',')})` : 'blank cells present'
+      });
+      return;
+    }
+
     const missing = [];
     if (!record.E) missing.push('E');
     if (!record.I) missing.push('I');
@@ -177,6 +199,13 @@ function evaluateMasterRows_(masterData, dataStartRow, catMap) {
 
     if (missing.length) {
       summary.excludedMissingRequired++;
+      if (summary.requiredMissingByColumn) {
+        missing.forEach(function(col) {
+          if (summary.requiredMissingByColumn[col] !== undefined) {
+            summary.requiredMissingByColumn[col]++;
+          }
+        });
+      }
       if (samples.missingRequired.length < 5) {
         samples.missingRequired.push(`masterシート ${rowNumber}行目: 必須列(${missing.join(',')})が空です。`);
       }
@@ -314,6 +343,17 @@ function hasBlankCell_(row){
   return row.some(cell=>s_(cell)==='');
 }
 
+function getBlankColumnLetters_(row){
+  const letters = [];
+  if(!Array.isArray(row)) return letters;
+  row.forEach(function(cell, idx){
+    if(s_(cell)===''){
+      letters.push(colIndexToLetter_(idx));
+    }
+  });
+  return letters;
+}
+
 /**
  * 行全体が空かを判定する
  * @param {Array<any>} row
@@ -350,47 +390,59 @@ function pushManualFix_(collector, entry){
   });
 }
 
-function csvEscape_(value){
-  if(value === null || value === undefined) return '';
-  const str = String(value);
-  if(/[",\n]/.test(str)){
-    return '"' + str.replace(/"/g,'""') + '"';
-  }
-  return str;
-}
 
-function writeManualFixQueue_(rows){
-  try{
-    const lines = ['sheet,row,key,reason,detail'];
-    (rows || []).forEach(entry => {
-      lines.push([
-        csvEscape_(entry.sheet),
-        csvEscape_(entry.row),
-        csvEscape_(entry.key),
-        csvEscape_(entry.reason),
-        csvEscape_(entry.detail)
-      ].join(','));
-    });
-
-    const csvContent = lines.join('\n');
-    const fileName = (MANUAL_FIX && MANUAL_FIX.FILE_NAME) || 'manual_fix_queue.csv';
-    const mimeType = (MANUAL_FIX && MANUAL_FIX.MIME_TYPE) || MimeType.CSV;
-    const folder = MANUAL_FIX && MANUAL_FIX.DRIVE_FOLDER_ID
-      ? DriveApp.getFolderById(MANUAL_FIX.DRIVE_FOLDER_ID)
-      : DriveApp.getRootFolder();
-
-    let fileIterator = folder.getFilesByName(fileName);
-    if(fileIterator.hasNext()){
-      const file = fileIterator.next();
-      file.setTrashed(false);
-      file.setContent(csvContent);
-    } else {
-      folder.createFile(fileName, csvContent, mimeType);
+function writeManualFixQueue_(entries, spreadsheet) {
+  try {
+    if (!entries || !entries.length) return 0;
+    const sheetName = (MANUAL_FIX && MANUAL_FIX.SHEET_NAME) || 'manual_fix_queue';
+    const header = (MANUAL_FIX && MANUAL_FIX.HEADER) || ['sheet', 'row', 'key', 'reason', 'detail'];
+    const ss = spreadsheet || SpreadsheetApp.openById(SHEET_IDS.MASTER);
+    let sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
     }
-  }catch(e){
-    console.error('manual_fix_queue.csv の出力に失敗しました: ' + e.message);
+    if (sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, header.length).setValues([header]);
+    }
+    const values = entries.map(function(entry) {
+      return [
+        entry.sheet || '',
+        entry.row || '',
+        entry.key || '',
+        entry.reason || '',
+        entry.detail || ''
+      ];
+    });
+    const startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, values.length, values[0].length).setValues(values);
+    return values.length;
+  } catch (e) {
+    console.error('manual_fix_queue append failed: ' + e.message);
+    return 0;
   }
 }
+
+function isStrictBlankCheckEnabled_(){
+  var defaultValue = true;
+  if (typeof EVALUATION_FLAGS !== 'undefined' && EVALUATION_FLAGS && typeof EVALUATION_FLAGS.STRICT_BLANK_CHECK === 'boolean') {
+    defaultValue = EVALUATION_FLAGS.STRICT_BLANK_CHECK;
+  }
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (props) {
+      var override = props.getProperty('STRICT_BLANK_CHECK');
+      if (override !== null && override !== undefined) {
+        var normalized = String(override).toLowerCase();
+        if (normalized === 'true' || normalized === '1' || normalized === 'on') return true;
+        if (normalized === 'false' || normalized === '0' || normalized === 'off') return false;
+      }
+    }
+  } catch (err) {
+    console.warn('STRICT_BLANK_CHECK property read failed: ' + err.message);
+  }
+  return defaultValue;
+}
+
 
 /**
  * ===================================================================
@@ -398,53 +450,6 @@ function writeManualFixQueue_(rows){
  * ===================================================================
  */
 function debugDataProcessing() {
-  try {
-    const ss = SpreadsheetApp.openById(SHEET_IDS.MASTER);
-    const shM = ss.getSheetByName('master');
-    const shC = ss.getSheetByName(CATEGORY_SHEET_NAME);
-
-    if (!shM) return { error: '「master」シートが見つかりません。' };
-    if (!shC) return { error: `「${CATEGORY_SHEET_NAME}」シートが見つかりません。` };
-
-    const masterHeaderRows = (SHEET_LAYOUT && SHEET_LAYOUT.MASTER_HEADER_ROWS) || 2;
-    const masterDataStartRow = masterHeaderRows + 1;
-    const masterLastCol = colLetterToIndex_((SHEET_LAYOUT && SHEET_LAYOUT.MASTER_LAST_COL_A1) || 'AL') + 1;
-    const masterRowCount = Math.max(0, shM.getLastRow() - masterHeaderRows);
-    const masterColCount = Math.min(masterLastCol, shM.getLastColumn());
-    const masterData = masterRowCount > 0 && masterColCount > 0
-      ? shM.getRange(masterDataStartRow, 1, masterRowCount, masterColCount).getValues()
-      : [];
-
-    const categoryHeaderRows = (SHEET_LAYOUT && SHEET_LAYOUT.CATEGORY_HEADER_ROWS) || 1;
-    const categoryDataStartRow = categoryHeaderRows + 1;
-    const categoryLastCol = colLetterToIndex_((SHEET_LAYOUT && SHEET_LAYOUT.CATEGORY_LAST_COL_A1) || 'F') + 1;
-    const categoryRowCount = Math.max(0, shC.getLastRow() - categoryHeaderRows);
-    const categoryColCount = Math.min(categoryLastCol, shC.getLastColumn());
-    const categoryData = categoryRowCount > 0 && categoryColCount > 0
-      ? shC.getRange(categoryDataStartRow, 1, categoryRowCount, categoryColCount).getValues()
-      : [];
-
-    const catMap = buildCategoryMap_(categoryData);
-    const evaluation = evaluateMasterRows_(masterData, masterDataStartRow, catMap);
-    const summary = evaluation.summary;
-    const samples = evaluation.samples;
-
-    return {
-      total_master_rows: summary.totalMasterRows,
-      category_map_entries: catMap.size,
-      excluded_empty_rows: summary.excludedEmptyRows,
-      excluded_blank_cells: summary.excludedBlankCells,
-      excluded_missing_required: summary.excludedMissingRequired,
-      excluded_invalid_lens_url: summary.excludedInvalidLensUrl,
-      excluded_missing_category: summary.excludedMissingCategory,
-      final_unique_candidates: summary.validCandidateKeys.size,
-      debug_examples_empty_rows: samples.emptyRows,
-      debug_examples_blank_cells: samples.blankCells,
-      debug_examples_missing_required: samples.missingRequired,
-      debug_examples_invalid_lens_url: samples.invalidLensUrl,
-      debug_examples_missing_category: samples.missingCategory
-    };
-  } catch (e) {
-    return { error: 'デバッグ処理中に予期せぬエラーが発生しました: ' + e.message, stack: e.stack };
-  }
+  return getHealthReport();
 }
+

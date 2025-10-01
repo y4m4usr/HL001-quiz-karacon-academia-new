@@ -3,9 +3,14 @@
 // Webアプリ エントリーポイント
 // ===================================================================
 function doGet(e) {
-  return HtmlService.createTemplateFromFile('index') // v1.7: gas/ディレクトリ内を参照
+  var template = HtmlService.createTemplateFromFile('index'); // v1.7: gas/�f�B���N�g�������Q��
+  template.devPlaceholderEnabled = (typeof isDevFeatureEnabled_ === 'function')
+    ? isDevFeatureEnabled_('ALLOW_PLACEHOLDER')
+    : false;
+
+  return template
       .evaluate()
-      .setTitle('Quiz☆カラコンアカデミア')
+      .setTitle('Quiz���J���R���A�J�f�~�A')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 

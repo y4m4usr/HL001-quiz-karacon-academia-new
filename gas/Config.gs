@@ -1,5 +1,11 @@
 
-const GITHUB_REPO = {
+/** SPEC-LOCK: 本ファイルは「最終構造化仕様（出題ロジック簡素化版）」に準拠し、以下を厳守する。
+ *  - 2行目=項目／3行目〜=データ、行内に空白セルが1つでもあれば不採用（評価範囲は CFG.LAYOUT の LAST_COL_INDEX まで）
+ *  - 必須列 E/I/J/K/X がすべて非空。クイズ表示は X=レンズのみ。W=サムネは正解時フィードバック用。
+ *  - ランタイムで Drive は触らない（CSV出力や DriveApp を使用しない）。manual_fix_queue はシートへ追記。
+ *  - CK=E|I|J|K でランキング/マイ成績を集計。
+ * 改変が必要な場合は Config のみ変更し、関数の契約は変えないこと。
+ */const GITHUB_REPO = {
   OWNER_REPO: 'y4m4usr/HL001-quiz-karacon-academia-new',
   BRANCH: 'main',
   LENS_IMAGE_PATH: 'images/_lensimage'
@@ -20,9 +26,17 @@ const SHEET_LAYOUT = {
 };
 
 const MANUAL_FIX = {
-  FILE_NAME: 'manual_fix_queue.csv',
-  MIME_TYPE: MimeType.CSV,
-  DRIVE_FOLDER_ID: null // nullの場合はスクリプト同一ドライブ直下に出力
+  SHEET_NAME: 'manual_fix_queue',
+  HEADER: ['sheet', 'row', 'key', 'reason', 'detail']
+};
+
+const EVALUATION_FLAGS = {
+  STRICT_BLANK_CHECK: true
+};
+
+const DEV_FEATURES = {
+  ALLOW_SEED_DATA: false,
+  ALLOW_PLACEHOLDER: false
 };
 
 const COLS = {
