@@ -303,33 +303,13 @@ const App = (() => {
     }
 
     // ★ 変更: GitHubプロキシ経由で画像を設定する関数
-    const DEV_PLACEHOLDER_ENABLED = <?= devPlaceholderEnabled ? 'true' : 'false' ?>;
-    const placeholder = DEV_PLACEHOLDER_ENABLED
-        ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E"
-        : '';
-    const errorPlaceholder = DEV_PLACEHOLDER_ENABLED
-        ? placeholder.replace('Loading...', 'Error')
-        : '';
-
     function setImageWithProxy(imgElement, githubUrl) {
-        console.log("Attempting to load image:", githubUrl);
-        if (!imgElement) return;
-
-        imgElement.dataset.src = githubUrl || '';
-
-        if (DEV_PLACEHOLDER_ENABLED) {
-            imgElement.src = placeholder;
-        } else {
-            imgElement.removeAttribute('src');
-        }
+        console.log("Attempting to load image:", githubUrl); // デバッグ用にURLをコンソールに出力        const DEV_PLACEHOLDER_ENABLED = <?= devPlaceholderEnabled ? 'true' : 'false' ?>;
+        imgElement.src = placeholder;
 
         if (!githubUrl) {
             console.error('Image URL is null or empty.');
-            if (DEV_PLACEHOLDER_ENABLED) {
-                imgElement.src = errorPlaceholder;
-            } else {
-                imgElement.removeAttribute('src');
-            }
+            imgElement.src = errorPlaceholder;
             return;
         }
 
@@ -339,24 +319,17 @@ const App = (() => {
                     imgElement.src = result.data;
                 } else {
                     console.error('Proxy failed:', result ? result.error : 'Unknown error');
-                    if (DEV_PLACEHOLDER_ENABLED) {
-                        imgElement.src = errorPlaceholder;
-                    } else {
-                        imgElement.removeAttribute('src');
-                    }
+                    imgElement.src = errorPlaceholder;
                 }
             })
             .withFailureHandler(error => {
                 console.error('Proxy call failed:', error);
-                if (DEV_PLACEHOLDER_ENABLED) {
-                    imgElement.src = errorPlaceholder;
-                } else {
-                    imgElement.removeAttribute('src');
-                }
+                imgElement.src = errorPlaceholder;
             })
             .getGitHubImageAsBase64(githubUrl);
     }
 
+    // クイズ開始
     function startQuiz(mode) {
         state.gameMode = mode;
         state.answers = []; // 回答履歴をリセット
