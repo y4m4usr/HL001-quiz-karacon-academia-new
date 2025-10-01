@@ -1,3 +1,11 @@
+<!-- SPEC-LOCK: 本ファイルは「最終構造化仕様（出題ロジック簡素化版）」に準拠し、以下を厳守する。
+  - 2行目=項目/3行目〜=データ、行内に空白セルが1つでもあれば不採用（評価範囲は CFG.LAYOUT の LAST_COL_INDEX まで）
+  - 必須列 E/I/J/K/X がすべて非空。クイズ表示は X=レンズのみ。W=サムネは正解時フィードバック用。
+  - ランタイムで Drive は触らない（CSV出力や DriveApp を使用しない）。manual_fix_queue はシートへ追記。
+  - CK=E|I|J|K でランキング/マイ成績を集計。
+  改変が必要な場合は Config のみ変更し、関数の契約は変えないこと。
+-->
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -295,16 +303,33 @@ const App = (() => {
     }
 
     // ★ 変更: GitHubプロキシ経由で画像を設定する関数
-    function setImageWithProxy(imgElement, githubUrl) {
-        console.log("Attempting to load image:", githubUrl); // デバッグ用にURLをコンソールに出力
-        const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E";
-        const errorPlaceholder = placeholder.replace('Loading...', 'Error');
+    const DEV_PLACEHOLDER_ENABLED = <?= devPlaceholderEnabled ? 'true' : 'false' ?>;
+    const placeholder = DEV_PLACEHOLDER_ENABLED
+        ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23FFB6C1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='white' font-size='16'%3ELoading...%3C/text%3E%3C/svg%3E"
+        : '';
+    const errorPlaceholder = DEV_PLACEHOLDER_ENABLED
+        ? placeholder.replace('Loading...', 'Error')
+        : '';
 
-        imgElement.src = placeholder;
+    function setImageWithProxy(imgElement, githubUrl) {
+        console.log("Attempting to load image:", githubUrl);
+        if (!imgElement) return;
+
+        imgElement.dataset.src = githubUrl || '';
+
+        if (DEV_PLACEHOLDER_ENABLED) {
+            imgElement.src = placeholder;
+        } else {
+            imgElement.removeAttribute('src');
+        }
 
         if (!githubUrl) {
             console.error('Image URL is null or empty.');
-            imgElement.src = errorPlaceholder;
+            if (DEV_PLACEHOLDER_ENABLED) {
+                imgElement.src = errorPlaceholder;
+            } else {
+                imgElement.removeAttribute('src');
+            }
             return;
         }
 
@@ -314,17 +339,24 @@ const App = (() => {
                     imgElement.src = result.data;
                 } else {
                     console.error('Proxy failed:', result ? result.error : 'Unknown error');
-                    imgElement.src = errorPlaceholder;
+                    if (DEV_PLACEHOLDER_ENABLED) {
+                        imgElement.src = errorPlaceholder;
+                    } else {
+                        imgElement.removeAttribute('src');
+                    }
                 }
             })
             .withFailureHandler(error => {
                 console.error('Proxy call failed:', error);
-                imgElement.src = errorPlaceholder;
+                if (DEV_PLACEHOLDER_ENABLED) {
+                    imgElement.src = errorPlaceholder;
+                } else {
+                    imgElement.removeAttribute('src');
+                }
             })
             .getGitHubImageAsBase64(githubUrl);
     }
 
-    // クイズ開始
     function startQuiz(mode) {
         state.gameMode = mode;
         state.answers = []; // 回答履歴をリセット

@@ -1,8 +1,39 @@
+function assertDevFeatureEnabled_(flag) {
+  if (!isDevFeatureEnabled_(flag)) {
+    throw new Error('DEV feature ' + flag + ' is disabled.');
+  }
+}
+
+function isDevFeatureEnabled_(flag, fallback) {
+  var defaultValue = typeof fallback === 'boolean' ? fallback : false;
+  if (typeof DEV_FEATURES !== 'undefined' && DEV_FEATURES && Object.prototype.hasOwnProperty.call(DEV_FEATURES, flag)) {
+    defaultValue = DEV_FEATURES[flag];
+  }
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (props) {
+      var override = props.getProperty('DEV_FEATURE_' + flag);
+      if (override !== null && override !== undefined) {
+        var normalized = String(override).toLowerCase();
+        if (normalized === 'true' || normalized === '1' || normalized === 'on') return true;
+        if (normalized === 'false' || normalized === '0' || normalized === 'off') return false;
+      }
+    }
+  } catch (err) {
+    console.warn('DEV feature flag read failed (' + flag + '): ' + err.message);
+  }
+  return defaultValue === true;
+}
+
 // ===================================================================
 // データ整備ユーティリティ（テスト用）
 // ===================================================================
 
 function seedMinimalQuizData() {
+  assertDevFeatureEnabled_('ALLOW_SEED_DATA');
+  if (!isDevFeatureEnabled_('ALLOW_PLACEHOLDER')) {
+    throw new Error('Placeholder-based sample data is disabled.');
+  }
   const ss = SpreadsheetApp.openById(SHEET_IDS.MASTER);
   const shMaster = ss.getSheetByName('master');
   const shCategory = ss.getSheetByName(CATEGORY_SHEET_NAME);
