@@ -1,41 +1,56 @@
+/** SPEC-LOCK: v1.2 最終構造化仕様
+ * - master: 2行目=項目 / 3行目〜=データ
+ * - 行内に空白セルが1つでもあれば不採用（評価範囲は AL まで）
+ * - 必須 E/I/J/K（出題はX=レンズ、W=サムネは正解時のみ）
+ * - ランタイムで Drive は使わず、GitHub直配信（raw→CDNフォールバック）
+ * - 画像命名: E_I_J_K_[lens|samune].jpg
+ */
 
-const GITHUB_REPO = {
-  OWNER_REPO: 'y4m4usr/HL001-quiz-karacon-academia-new',
-  BRANCH: 'main',
-  LENS_IMAGE_PATH: 'images/_lensimage'
-};
+const CFG = {
+  // ※必ず置き換え
+  SHEET_IDS: {
+    MASTER: '1EkTjV__k1vAl08PlbOUhYpbFEGC-F_LL_26o1-HT1AI',
+    CATEGORY: '1EkTjV__k1vAl08PlbOUhYpbFEGC-F_LL_26o1-HT1AI'
+  },
 
-const SHEET_IDS = {
-  MASTER:   '1EkTjV__k1vAl08PlbOUhYpbFEGC-F_LL_26o1-HT1AI', // HL001_テスト用_109販促データ（検証用）
-  USERS:    '1X0TyeI_1zER6xIceUDSbJX-GFbqvi2orAiSWHRXlC7M',
-  HISTORY:  '1ShWXLvY9RimRYfsAkwoRyM2Bfwj4a3zVmr5bQc33-o0',
-  RANKINGS: '1I2REcy2v5OpyzoY3k61kCzJ3SYKOBBCMxTLCeHWutT8',
-};
+  SHEETS: { MASTER: 'master', CATEGORY: 'カラーカテゴリ' },
 
-const SHEET_LAYOUT = {
-  MASTER_HEADER_ROWS: 2,          // 1=タイトル等, 2=項目, 3〜データ
-  MASTER_LAST_COL_A1: 'AL',       // 評価対象の最終列（余計な空白列の影響を防ぐ）
-  CATEGORY_HEADER_ROWS: 1,        // 1=項目, 2〜データ（シートによっては2を指定）
-  CATEGORY_LAST_COL_A1: 'F'       // カテゴリシートの読込上限列
-};
+  // ～AL列（38列）までを評価
+  LAYOUT: {
+    MASTER:   { HEADER_ROWS: 2, START_ROW: 3, LAST_COL_INDEX: 38 },
+    CATEGORY: { HEADER_ROWS: 1, START_ROW: 2, LAST_COL_INDEX: 6 }
+  },
 
-const MANUAL_FIX = {
-  FILE_NAME: 'manual_fix_queue.csv',
-  MIME_TYPE: MimeType.CSV,
-  DRIVE_FOLDER_ID: null // nullの場合はスクリプト同一ドライブ直下に出力
-};
+  // 1-based（シートの列番号に合わせる）
+  COLS: { E:5, I:9, J:10, K:11, P:16, Q:17, R:18, W:23, X:24, AL:38 },
 
-const COLS = {
-  MASTER: {
-    PRODUCT_CODE: 'E', // 元品番
-    BRAND: 'I',       // ブランド（カナ）
-    COLOR: 'J',       // カラー（カナ）
-    WEAR_PERIOD: 'K', // 装用期間
-    DIA: 'P',         // DIA
-    GDIA: 'Q',        // G.DIA
-    BC: 'R',          // BC
-    THUMB_URL: 'W',   // サムネURL
-    LENS_URL: 'X',    // レンズURL
-    COMMENT: 'AL',    // コメント
+  // GitHub 画像配置先（本番）
+  GITHUB: {
+    USER: 'y4m4usr',
+    REPO: 'HL001-quiz-karacon-academemia-new',
+    // 追随なら 'main'、検収固定ならコミットSHA
+    REF : 'main',
+    PATHS: {
+      LENS_DIR   : 'imagesnew1/lens/lens1',
+      SAMUNE_DIR : 'imagesnew1/samune/samune1'
+    }
+  },
+
+  STRICT: {
+    ROW_MUST_BE_FULL: true // 行内空白セルがあれば不採用（ALまで）
   }
 };
+
+function rawBase_(){
+  const g=CFG.GITHUB; return `https://raw.githubusercontent.com/${g.USER}/${g.REPO}/${g.REF}`;
+}
+function toRaw_(path){
+  return `${rawBase_()}/${String(path).replace(/^\/+/, '')}`;
+}
+function toCdnFallback_(rawUrl){
+  // raw → jsDelivr
+  return rawUrl.replace(
+    /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/i,
+    'https://cdn.jsdelivr.net/gh/$1/$2@$3/$4'
+  );
+}

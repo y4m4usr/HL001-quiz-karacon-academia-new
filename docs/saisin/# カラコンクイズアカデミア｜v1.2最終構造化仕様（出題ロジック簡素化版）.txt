@@ -1,0 +1,519 @@
+# カラコンクイズアカデミア｜最終構造化仕様（出題ロジック簡素化版）
+
+## 0. このドキュメントの目的
+
+* **“109販促データ（マスター）→クイズ問題”** の道筋を**最小・堅牢**に定義する
+* 実装担当が**迷わない**よう、**除外条件**と**誤答抽出**まで**手順化**
+* 既存仕様（列定義／W=サムネ, X=レンズ／E/I/J/Kキー）との**整合性を担保**
+
+---
+
+## 1. データ前提（マスター／カテゴリ）
+
+### 1.1 109販促データ（**master**タブ）
+
+* **2行目＝項目（ヘッダ）**、**3行目〜＝データ本体**
+* **空白セルが1つでもある行は不採用**（空白行も不採用）
+* **必須列**（1始まり / 既存仕様に準拠）
+
+  * **E=元品番**（以降“E”）、**I=ブランド(カナ)**、**J=カラー(カナ)**、**K=装用期間**（複合キー） 
+  * **X=レンズ画像URL**（クイズ画面は**X列の画像**を使用。Wは正解フィードバック用） 
+  * 参考: P=DIA, Q=G.DIA, R=BC, W=サムネ, AL=コメント（任意） 
+
+### 1.2 109販促データ（**カラーカテゴリ**タブ）
+
+* **B=ブランド(カナ)**、**C=カラー(カナ)**、**F=カラーカテゴリ**（例: `ブラウン,ベージュ` のようなカンマ区切り） 
+* **空白セルがあればその行は不採用**（B/C/Fのいずれも必須）
+
+> **キー統一**：画像や集計は **E/I/J/K** を**完全一致**の基準にします（Strict）。ファイル名も `E_I_J_K_{lens|samune}.jpg` に揃える（将来のmanifest/同期でも一貫）。
+
+---
+
+## 2. 図解：全体フロー（取り込み→出題）
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Noto Sans JP, system-ui, -apple-system, Segoe UI, Hiragino Kaku Gothic ProN, Meiryo, sans-serif"}}}%%
+flowchart TD
+  A[Sheets: 109販促データ<br/>masterタブ(2=項目,3~=データ)]:::s
+  B[Sheets: カラーカテゴリ<br/>(B=ブランド,C=カラー,F=カテゴリ)]:::s
+  C[読み込みフィルタ<br/>(3行目〜、空白セル/行は除外)]:::p
+  D[候補集合を生成<br/>必須: E/I/J/K が埋まり、X(レンズ画像)あり]:::p
+  E[正答1件を選択<br/>(E|I|J|K完全一致の1レコード)]:::p
+  F[カテゴリ行に照合<br/>(B=I, C=J が一致する行に限定)]:::p
+  G[F列を分解: {色語リスト}]:::p
+  H[誤答候補を探索<br/>色語のいずれかを含む別商品を収集]:::p
+  I[重複/同一商品の除外/画像有無の再確認]:::p
+  J[不足時フォールバック選抜]:::p
+  K[選択肢= 正答1 + 誤答3 を確定]:::p
+  L[問題オブジェクトに整形<br/>(画像= X列; 表示名=ブランド/カラー/...)]:::p
+
+  A --> C --> D --> E --> F --> G --> H --> I --> J --> K --> L
+  B --> F
+classDef s fill:#fff,stroke:#999;
+classDef p fill:#eef,stroke:#66f;
+```
+
+* **X=レンズのみ**をクイズで使用（W=サムネは正解時フィードバック）。
+* **E/I/J/K 完全一致**を“同一商品”と見なす厳格運用（後続のランキング/成績のキーとも一致）。
+
+---
+
+## 3. 出題ロジック（確定）
+
+### 3.1 フィルタ条件（読み込み時）
+
+**masterタブは3行目から**走査し、下記**すべて満たす**行のみ採用：
+
+1. **E, I, J, K, X がすべて非空**
+2. 行全体に**空白セルが残っていない**（必須列に限らず空白があれば除外）
+3. **X（レンズ画像URL）が有効**（URL形式・アクセス可の確認は可能な範囲で／不可なら除外）
+   　※Wは参考（正解フィードバック用途）で不採用に影響しない。
+
+> **注**：**2行目は項目行**のためデータ対象外。ヘッダの空白有無に依存せず、**列番号で確実に参照**してください（I/J/K/X 等）。
+
+### 3.2 正答の決定
+
+* フィルタ済み集合からランダムに1件を**正答**として選ぶ（**E|I|J|K** を保持）
+* 表示に使う画像は **X列（レンズ）**。
+
+### 3.3 カテゴリ照合（“正答の色カテゴリ”の確定）
+
+* **カラーカテゴリ**タブから、**B==I かつ C==J** の行を1件取得（完全一致） 
+* その行の **F列** を **`[,，、／/・]`** などで分割 → **{色語}** の集合を得る
+  例：`"ブラウン,ベージュ"` → `{"ブラウン","ベージュ"}`
+
+### 3.4 誤答3件の抽出（“色カテゴリに合致”のもの）
+
+* **候補母集団**＝3.1で残った集合から、**正答と異なる**レコードのみ（≠ 同一E|I|J|K）
+* **条件**：その候補に対するカテゴリ行（B=I, C=J）が存在し、**F列の色語に {色語} の**いずれか**が含まれる
+
+  * 例：正答のカテゴリに**“ブラウン”**があれば、**“ブラウン”**を含む別商品のカテゴリが対象
+* **X列（レンズ画像）が有効**なものだけに限定
+* **3件**見つかるまで抽出（ランダム or 安定シャッフル）
+
+#### フォールバック（3件未満のとき）
+
+1. 同カテゴリが不足 → **同ブランド(I一致)** で **J≠正答J** かつ **X有り**
+2. それでも不足 → **全ブランド**から **X有り** で **E|I|J|K ≠ 正答**
+   ※常に**同一商品は除外**（E|I|J|K完全一致はNG）。**重複は除外**。
+
+> “カテゴリによる誤答選抜”の導入により、**見た目が紛らわしい色味**で誤答が揃うようになります（同一商品定義は E/I/J/K で一貫）。
+
+---
+
+## 4. 問題オブジェクト（APIレスポンス例）
+
+```jsonc
+{
+  "qid": "CK:E|I|J|K|<hash>",
+  "image": "<X列のURL>",      // レンズ画像
+  "specs": { "DIA":"", "G_DIA":"", "BC":"" }, // 任意（ヒント用）
+  "correct": { "E":"", "I":"", "J":"", "K":"" },
+  "options": [
+    { "label":"<ブランド名 I> / <カラー名 J>", "isCorrect": true },
+    { "label":"<I'/J'>", "isCorrect": false },
+    { "label":"<I''/J''>", "isCorrect": false },
+    { "label":"<I'''/J'''>", "isCorrect": false }
+  ]
+}
+```
+
+* 画像は **X列（レンズ）** を確実に使用。**W列は正解時のサムネ用途**（別UI）。
+* “同一商品”の判定は**E|I|J|K**で完全一致。
+
+---
+
+## 5. 疑似コード（GAS想定・そのまま下敷きにできます）
+
+### 5.1 共通ユーティリティ
+
+```js
+// 空白系の判定（null/undefined/空文字/空白のみ）
+const isBlank = v => v === null || v === undefined || String(v).trim() === "";
+
+// 文字列 → 色語配列（カンマや各種区切りを許容）
+const splitColors = s =>
+  String(s || "")
+    .split(/[,\u3001\uFF0C\u30FB\/／|]+/)
+    .map(x => x.trim())
+    .filter(x => x);
+
+// E|I|J|K の複合キー
+const ck = r => [r.E, r.I, r.J, r.K].join("|");
+```
+
+### 5.2 マスター読み込み（**3行目から**＋**空白除外**）
+
+```js
+function readMaster_(sh) {
+  // 2行目=項目、3行目〜=データ
+  const values = sh.getRange(3, 1, sh.getLastRow()-2, sh.getLastColumn()).getValues();
+  const COL = { // 1始まり → 0始まりへ
+    E: 4, I: 8, J: 9, K: 10, X: 23, P: 15, Q: 16, R: 17, W: 22, AL: 37
+  };
+  const rows = [];
+  for (const v of values) {
+    // 任意列も含め**空白セルがあれば不採用**
+    if (v.some(isBlank)) continue;
+    const r = {
+      E: v[COL.E], I: v[COL.I], J: v[COL.J], K: v[COL.K],
+      X: v[COL.X], P: v[COL.P], Q: v[COL.Q], R: v[COL.R],
+      W: v[COL.W], AL: v[COL.AL]
+    };
+    if ([r.E, r.I, r.J, r.K, r.X].some(isBlank)) continue; // 必須欠落
+    rows.push(r);
+  }
+  return rows;
+}
+```
+
+> **W=サムネ／X=レンズ**の役割と、**Xをクイズで使う**前提は既定仕様のとおり。
+
+### 5.3 カラーカテゴリ読み込み（**空白除外**）
+
+```js
+function readCategories_(sh) {
+  const values = sh.getDataRange().getValues(); // 必要なら3行目以降に調整
+  // 例：ヘッダ1~2行があるなら 3行目以降に変更
+  const B = 1, C = 2, F = 5; // 0始まり
+  const map = new Map(); // key: I|J → 色語配列
+  for (let i = 2; i < values.length; i++) { // 3行目〜
+    const v = values[i];
+    if (v.some(isBlank)) continue; // 空白セルがあれば除外
+    const I = String(v[B]).trim();
+    const J = String(v[C]).trim();
+    const colors = splitColors(v[F]);
+    if (!I || !J || colors.length === 0) continue;
+    map.set(`${I}|${J}`, colors);
+  }
+  return map;
+}
+```
+
+> **B=ブランド(カナ)、C=カラー(カナ)、F=カテゴリ**を用いる前提は既存要件と一致。
+
+### 5.4 誤答抽出ロジック
+
+```js
+function pickWrongAnswers_(correct, pool, catMap, n = 3) {
+  const key = `${correct.I}|${correct.J}`;
+  const colorWords = catMap.get(key) || [];
+  const corrCk = ck(correct);
+
+  // 1) 色カテゴリ一致の候補（同一商品除外、Xあり）
+  let cands = pool.filter(r => {
+    if (ck(r) === corrCk) return false;
+    const k = `${r.I}|${r.J}`;
+    const c = catMap.get(k) || [];
+    return c.length && colorWords.some(w => c.includes(w)) && !isBlank(r.X);
+  });
+
+  // シャッフル（安定シャッフルでも可）
+  cands = cands.sort(() => Math.random() - 0.5);
+
+  // 2) 足りなければフォールバック
+  const picked = [];
+  for (const r of cands) { if (picked.length < n) picked.push(r); }
+
+  if (picked.length < n) {
+    const sameBrand = pool.filter(r =>
+      ck(r) !== corrCk && r.I === correct.I && r.J !== correct.J && !isBlank(r.X)
+    );
+    for (const r of sameBrand) { if (picked.length < n && !picked.includes(r)) picked.push(r); }
+  }
+  if (picked.length < n) {
+    const any = pool.filter(r => ck(r) !== corrCk && !isBlank(r.X));
+    for (const r of any) { if (picked.length < n && !picked.includes(r)) picked.push(r); }
+  }
+
+  return picked.slice(0, n);
+}
+```
+
+### 5.5 1問の生成
+
+```js
+function makeQuestion_(correct, wrongs) {
+  const options = [
+    { label: `${correct.I} / ${correct.J}`, isCorrect: true },
+    ...wrongs.map(w => ({ label: `${w.I} / ${w.J}`, isCorrect: false }))
+  ].sort(() => Math.random() - 0.5);
+
+  return {
+    qid: `CK:${ck(correct)}`,
+    image: correct.X,              // レンズ画像(X列)
+    specs: { DIA: correct.P, G_DIA: correct.Q, BC: correct.R }, // 任意
+    correct: { E: correct.E, I: correct.I, J: correct.J, K: correct.K },
+    options
+  };
+}
+```
+
+---
+
+## 6. APIの最小契約（再掲・簡素版）
+
+* **GET** `?action=items` … 上記ロジックで **10問** 生成して返す（X画像／I,J表示名）
+* **POST** `?action=submit` … スコア等を履歴へ追記（既存仕様通りでOK）
+* **GET** `?action=ranking|mystats` … 既存のE|I|J|Kキーでの集計に整合（将来拡張時も一貫）
+
+---
+
+## 7. 品質ゲート（必ず落とすチェック）
+
+* **読み込み時**：
+
+  * 行内に**空白セルが1つでもある** → **除外**
+  * **E/I/J/K/X** の**いずれか空** → **除外**
+  * **カテゴリ側**：B/C/Fの**いずれか空** → **除外**
+* **誤答選抜**：
+
+  * **同一商品（E|I|J|K完全一致）は禁止**
+  * **画像Xが無い候補は不採用**
+  * **重複ラベル**や**同じ(I/J)の重複**は除外（違う候補に置換）
+* **フォント**：可視化や画面は **Noto Sans JP** を適用（woff2を同梱/CSS指定） 
+
+```css
+@font-face{
+  font-family:"Noto Sans JP";
+  src:url("./assets/fonts/NotoSansJP-Regular.woff2") format("woff2");
+  font-display:swap;
+}
+html,body,*{ font-family:"Noto Sans JP", system-ui, -apple-system, "Segoe UI",
+             "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; }
+```
+
+---
+
+## 8. テスト観点（現場チェック用）
+
+1. **行スキップ**：2行目（項目）は**必ず除外**／3行目〜のみ対象
+2. **空白除外**：E/I/J/K/Xのいずれか空の行が一切通らない
+3. **画像**：正答・誤答とも**X列画像**で表示される（Wは正解時のみ） 
+4. **カテゴリ連動**：正答のF列色語に**1語以上合致**する誤答が**3件**揃う
+5. **フォールバック**：3件に満たないケースで**補充**される
+6. **同一商品除外**：E/I/J/K完全一致が混ざらない（Strict） 
+7. **API整合**：ランキング/成績のキーと**E|I|J|Kで一致**（将来の集計強化に備える） 
+
+---
+
+## 9. 補足と根拠
+
+* **列定義・W/X の役割／カテゴリ列**は v1.7 の確定事項（クイズ画面は **X=レンズ**使用）｡ 
+* **E/I/J/K 完全一致**を“同一商品”の基準にし、命名・集計・参照の**SSOT化**を図る方針は v1.9.1 で厳格化済み。 
+* **ランキング/マイ成績**も **E|I|J|K** キーで一貫運用（将来の可視化・集計と齟齬が出ない）。 
+* **画像はX列（レンズ）**、**W列は正解時サムネ**の使用は v1.6.1→v1.7 で運用確定。
+* 既存の**権限・同期**（Driveは参照のみ→GitHub配信／GASのURL組立て等）は本ロジックと矛盾しません（必要に応じてmanifestへ段階移行可）。
+
+---
+
+### 一行まとめ
+
+> **「3行目以降のみ読取」「空白があれば即除外」「E/I/J/K＋X必須」「カテゴリFの色語に合致する“別商品”を誤答3件」**――この4点を満たす最小ロジックで、**安定して紛らわしい良問**を自動生成します。
+
+
+########手順書
+**「ドライラン → 1件だけ実施 → 全量」**の順で**超具体手順**に落とし込みます。
+（根拠：**最終構造化仕様**＝3行目〜データ／空白セルが1つでもある行は不採用／E・I・J・K・X必須／誤答3件はカテゴリFから、X=レンズ・W=サムネ、ランタイムはGitHub直配信、集計キーはE|I|J|K完全一致）   
+
+---
+
+# 成功ゴール（これができたらOK）
+
+* **クイズはGitHub上のX（レンズ画像）だけ**を使って出題（Wは正解時サムネ専用）。
+* **ランタイムでDriveは見ない**（Driveは夜間同期のみ）、**画像はGitHub直配信（raw→CDNフォールバック）**。 
+* 出題ロジック：**3行目〜のみ／行内に空白が1つでもあれば不採用／E・I・J・K・X必須／カテゴリF語から誤答3件＋フォールバック**。
+* **ランキング／マイ成績**は **E|I|J|K完全一致（CK）**で集計・表示。
+* 画面・図・グラフは**Noto Sans JP**で文字化けなし。
+
+---
+
+# 0. 事前準備（触る順番）
+
+**A. GitHub**：対象リポジトリを用意（例：`gas/*`, `docs/*`, `images/*` がある構成）。
+**B. Google スプレッドシート**：`master` / `カラーカテゴリ` に“閲覧権限”あり。
+**C. GAS（Apps Script）**：Webアプリ公開URL（`.../exec`）がある。
+**D. フォント**：`docs/assets/fonts/NotoSansJP-Regular.woff2` を置ける（後述コードをコピペ）。
+
+> 用語だけ把握：「**CK**＝`E|I|J|K`（元品番/ブランド(カナ)/カラー(カナ)/装用期間の完全一致キー）。」
+
+---
+
+# 1. ブランチを切る（失敗しても戻れるように）
+
+1. GitHub Desktop か GitHub 画面で **`feat/ssot-spec-sync`** など**新しいブランチ**を作る。
+2. 以降の変更はこのブランチで行う（PRでレビュー→問題あればrevertで戻せる）。
+
+---
+
+# 2. Colab：画像取り込みの**ドライラン（出力なしの確認）**
+
+目的：**採用できる行数／除外行数**を確認。**この段階ではファイルを追加しない**。
+
+1. Google Colabでノート **`HL001_colubgazoushutoku.ipynb`** を開く。
+2. ノート先頭に**DRY_RUN=ON**（または「ドライラン」チェックをON）。
+3. **上から実行** → 画面に **「採用対象件数／除外件数」** が出れば成功。
+
+   * 除外条件：**行内に空白セルが1つでもある**／**E・I・J・K・Xのどれか空**／**XがURLでない／到達不可**。
+4. `manual_fix_queue.csv` が作られたらOK（**コミットはまだしない**）。
+
+**失敗例と直し方**
+
+* 「採用件数が少ない」→ `master` の必須列（E/I/J/K/X）を埋める。不明ならその行は当面除外でOK。
+
+---
+
+# 3. Colab：**1件だけ**GitHubへ追加（動作検証）
+
+目的：**命名ルール**と**GitHub差分**が正しく出るか確認。
+
+1. ノート設定を **DRY_RUN=OFF／LIMIT=1** に変更。
+2. 実行 → リポジトリ `images/_lensimage/` に **1ファイルだけ**増える：
+   **`E_I_J_K_lens.jpg`**（空白→`_`、記号→`_`、連続`_`は圧縮）。
+3. GitHub Desktop で差分を確認 → **コミット → Push → PR作成**。
+
+   * ここで**レビュー**（名前が崩れていないか／余計な変更が混ざっていないか）。
+
+**合格の目安**
+
+* 追加は**1ファイルのみ**／ファイル名は**先頭4トークンがE/I/J/K**＋`_lens.jpg`。
+
+---
+
+# 4. Colab：**全量**追加（本番差分）
+
+1. ノートの **LIMIT解除**（DRY_RUN=OFFのまま）。
+2. 実行 → 生成差分を**コミット→Push→PR**。**採用外**は `manual_fix_queue.csv` に残る。
+
+> 以降、**クイズ時はGitHubの画像のみ参照**（Driveは夜間同期だけ）。
+
+---
+
+# 5. GAS：コードを**コピペで貼り替え**（出題＆集計の中身）
+
+> 「難しい実装」は不要。**下のコードを丸ごと置換**すればOK。
+> これで「**3行目〜／空白セル行は不採用／E・I・J・K・X必須／カテゴリF→誤答3件／X画像だけ使用**」が実現します。
+
+### 5-1) `DataAccess.gs` / `QuizLogic.gs`（出題API）
+
+* **目的**：`?action=items` で**10問**返す。各問は**X（レンズ画像）**を使用。誤答3件は**カテゴリF**の色語で抽出（不足時フォールバック）。
+
+> ※プレイブックにある雛形（`readMaster_`, `readCategories_`, `pickWrongAnswers_`, `items_`）を**そのまま全貼り替え**でOK。
+> ※Configの**列番号**はあなたのシートに合わせて（例：E=5, I=9…）。
+
+### 5-2) `AuthRank.gs`（ランキング／マイ成績）
+
+* **目的**：**CK=E|I|J|K完全一致**で集計する `rankings` / `mystats` を返す。**attempts>=3**のみランキング表示。
+* **手順**：プレイブックの `rankings_()` / `mystats_()` を**丸ごと置換** → 既存 `doGet` でルーティング。
+
+### 5-3) `HealthTools.gs`（ヘルスチェック）
+
+* `?action=health` を追加（`master` / `カラーカテゴリ` 到達性のみでOK）。
+
+---
+
+# 6. GAS：**デプロイして動作チェック**（ドライ→本番）
+
+1. Apps Script 画面で「**デプロイ → 新しいデプロイ**」。URL（`.../exec`）を控える。
+2. ブラウザで `.../exec?action=health` を開く → **`ok:true`** ならOK。
+3. `.../exec?action=items` を開く → **10問**のJSONが返る。
+
+   * 各問の `image` は**X列URL**、`options` は**正答1＋誤答3**、`correct` に**E/I/J/K**が入っている。
+
+**つまずいたら**
+
+* 10問揃わない → **採用行が足りない／カテゴリF不足**。`manual_fix_queue.csv` で不足を把握し、データを補う。
+
+---
+
+# 7. フロント：**Noto Sans JP**を強制適用（コピペ）
+
+1. フォントファイル：`docs/assets/fonts/NotoSansJP-Regular.woff2` を置く。
+2. `docs/css/base.css` に**以下をコピペ**（全画面・図でNotoを使う）：
+
+```css
+@font-face{
+  font-family:"Noto Sans JP";
+  src:url("./../assets/fonts/NotoSansJP-Regular.woff2") format("woff2");
+  font-display:swap;
+}
+:root{ --font-sans: "Noto Sans JP", system-ui, -apple-system, "Segoe UI",
+                  "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; }
+html,body{ font-family: var(--font-sans); }
+```
+
+3. Mermaid図を書くときは、冒頭に**これを付ける**：
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Noto Sans JP, system-ui, -apple-system, Segoe UI, Hiragino Kaku Gothic ProN, Meiryo, sans-serif"}}}%%
+```
+
+（**Noto必須**は仕様の明記事項。文字化け防止のための必須作業です。）
+
+---
+
+# 8. ランキング／マイ成績の**目視テスト**
+
+* ランキング：`.../exec?path=rankings&ck=E|I|J|K&period=weekly` を開く → JSONで**attempts>=3**の並びが**正答数desc → 平均time asc → 試行数desc → 最終回答日時desc**になっている。
+* マイ成績：`.../exec?path=mystats&uid=（テスト端末のUID）` を開く → 該当UIDの記録が返る。
+
+---
+
+# 9. 「G→E時代の名残」を**安全に一括置換**（初心者向けのやり方）
+
+※ コマンド無しでOK。**VS Codeだけ**でやる手順。
+
+1. VS Code → **検索（Ctrl/Cmd+Shift+F）**
+2. **正規表現**をONにして、`G\|I\|J\|K` を検索（**置換はまだしない**）。
+3. 影響ファイルを**目視**（`node_modules` 等は対象外に）。
+4. 置換欄に `E|I|J|K` と入れて、**ファイル単位で置換→保存**（一気にやらず目視）。
+
+   * これで**CK=E|I|J|K**へ統一。
+
+（CLI派はripgrep/sed/PowerShellのスクリプトでもOKだが、初心者はVS Code置換を推奨。）
+
+---
+
+# 10. WとXの**使い分けチェック**（崩れてないか一括確認）
+
+* VS Code 検索で `W列|W=|W:` と `X列|X=|X:` をそれぞれ検索。
+* **クイズ表示はXのみ**、**Wは正解時サムネ**になっていることを確認。
+
+---
+
+# 11. 仕上げ（PRレビュー → マージ → ロールバック手順）
+
+* **PRレビュー観点**：
+
+  1. 画像参照は**GitHubのみ**（Drive直参照を無くしたか）
+  2. 出題の**10問**に**X画像**が入り、**誤答3件**が揃うか（カテゴリFから）
+  3. **ランキング／マイ成績**のCKが**E|I|J|K完全一致**であるか
+  4. **Noto Sans JP**が画面・図・グラフに反映しているか
+* **問題が出たら**：GitHubは**PRをrevert**、GASは**直前デプロイに切替**で即戻せる。
+
+---
+
+# 12. つまずき別・即解決メモ
+
+| つまずき             | よくある原因                    | これだけやれば直る                                                        |
+| ---------------- | ------------------------- | ---------------------------------------------------------------- |
+| `items` が10問返らない | 採用行が少ない／カテゴリF不足           | `master`でE/I/J/K/Xを埋める、カテゴリFを整備。フォールバック（同ブランド→全体）も有効に。           |
+| 画像が出ない           | ランタイムでDrive URL参照／Xが無効URL | **GitHub直配信**に固定（raw→CDN）。XはHTTP(S)＋到達可に。                        |
+| ランキングに自分が出ない     | attempts<3／CKが欠落          | 3回以上回答する／**E|I|J|K**からCK生成できているか確認。                              |
+| 日本語が豆腐になる        | Noto Sans JP 未適用          | `@font-face`＋`html,body{font-family:...}`、Mermaidの`init`もNoto指定。 |
+
+---
+
+## 参考：この手順が“仕様と一致”している根拠
+
+* **出題ロジックの絶対条件**（3行目〜／空白セル除外／E・I・J・K・X必須／カテゴリF→誤答3件／X=レンズ、W=サムネ／GitHub直配信／APIはitems/submit/ranking/mystats）に準拠。
+* **ランキング＆マイ成績**は **E|I|J|K完全一致（CK）**で集計・表示。**attempts>=3**などの掲載条件・ソート条件も反映。
+* **Drive依存の不安定さ**（権限差・URL差）を避け、**GitHubに一本化**する運用図に沿っている。
+* 画面構成のトーン＆マナーは既存ワイヤーフレームを前提にしている。
+
+---
+
+### 最後に（約束）
+
+ここまでの手順は、**「クリック＆コピペ」を基本動作**にして、**専門用語を少なく**し、**必ず“合格基準”を示す**形に直しました。
+もしまた詰まったら、「**どのステップ**で」「**何を実行して**」「**どんな表示になったか**」の3点だけ教えてください。そこから**該当ステップの置き換え用コピペ**を作って返します。

@@ -1,54 +1,38 @@
-
 // ===================================================================
-// Webアプリ エントリーポイント
+// Webアプリ ルーター + 画面ブートストラップ
 // ===================================================================
-function doGet(e) {
-  return HtmlService.createTemplateFromFile('index') // v1.7: gas/ディレクトリ内を参照
-      .evaluate()
-      .setTitle('Quiz☆カラコンアカデミア')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+function index_() {
+  // IFRAME サンドボックスで外部読み込みに強い表示
+  const html = HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('Quiz☆カラコンアカデミア')
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return html;
 }
 
-// ===================================================================
-// 画像プロキシ関数
-// ===================================================================
-function getGitHubImageAsBase64(githubUrl) {
-  if (!githubUrl || typeof githubUrl !== 'string' || !githubUrl.startsWith('https://raw.githubusercontent.com')) {
-    return { success: false, error: 'Invalid GitHub URL: ' + githubUrl };
+function doGet(e) {
+  const p = e && e.parameter || {};
+  // API
+  if (p.action) {
+    if (p.action === 'items')    return items_();
+    if (p.action === 'health')   return health_();
+    if (typeof rankings_ === 'function' && p.action === 'rankings') return rankings_(p);
+    if (typeof mystats_  === 'function' && p.action === 'mystats')  return mystats_(p);
+    return ContentService.createTextOutput(JSON.stringify({ok:false,error:'unknown action'}))
+      .setMimeType(ContentService.MimeType.JSON);
   }
+  // 画面
+  return index_();
+}
 
-  const cache = CacheService.getScriptCache();
-  const cacheKey = 'github_base64_' + githubUrl;
-  const cached = cache.get(cacheKey);
-
-  if (cached) {
-    return JSON.parse(cached);
-  }
-
-  try {
-    const response = UrlFetchApp.fetch(githubUrl, { muteHttpExceptions: true });
-    const responseCode = response.getResponseCode();
-
-    if (responseCode !== 200) {
-      throw new Error(`GitHub returned status ${responseCode} for ${githubUrl}`)
-    }
-
-    const blob = response.getBlob();
-    const base64 = Utilities.base64Encode(blob.getBytes());
-    const mimeType = blob.getContentType();
-    
-    const result = {
-      success: true,
-      data: `data:${mimeType};base64,${base64}`
-    };
-    
-    const jsonResult = JSON.stringify(result);
-    cache.put(cacheKey, jsonResult, 21600); // 6時間キャッシュ
-
-    return result;
-
-  } catch (err) {
-    console.error("GitHub Image proxy error for URL " + githubUrl + ": " + err.toString());
-    return { success: false, error: `Failed to fetch image. URL: ${githubUrl}. Error: ${err.message}` };
+function doPost(e){
+  try{
+    const body = e?.postData?.contents ? JSON.parse(e.postData.contents) : (e?.parameter||{});
+    if (typeof submit_ === 'function' && body.action === 'submit') return submit_(body);
+    return ContentService.createTextOutput(JSON.stringify({ok:false,error:'unknown action'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }catch(err){
+    return ContentService.createTextOutput(JSON.stringify({ok:false,error:String(err)}))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
