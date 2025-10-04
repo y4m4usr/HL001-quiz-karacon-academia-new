@@ -1,37 +1,43 @@
 const CFG = {
-  SHEET_IDS: {
-    MASTER  : '1EkTjV__k1vAl08PlbOUhYpbFEGC-F_LL_26o1-HT1AI',
-    CATEGORY: '1EkTjV__k1vAl08PlbOUhYpbFEGC-F_LL_26o1-HT1AI'
-  },
-  SHEETS: { MASTER: 'master', CATEGORY: 'カラーカテゴリ' },
+	SHEET_IDS: {
+		// Production spreadsheet that contains both sheets: master and カラーカテゴリ
+		MASTER: '1VNpWeHTgSlNOnka4kdMd9TG1eCB3O5CTkBvg8co8uSM',
+		CATEGORY: '1VNpWeHTgSlNOnka4kdMd9TG1eCB3O5CTkBvg8co8uSM'
+	},
 
-  LAYOUT: {
-    MASTER  : { HEADER_ROWS: 2, START_ROW: 3, LAST_COL_INDEX: 38 }, // ～AL
-    CATEGORY: { HEADER_ROWS: 1, START_ROW: 2, LAST_COL_INDEX: 6 }   // ～F
-  },
+	SHEETS: {
+		MASTER: 'master',
+		CATEGORY: 'カラーカテゴリ'
+	},
 
-  COLS: {
-    E:5, I:9, J:10, K:11,
-    P:16, Q:17, R:18,
-    W:23, X:24,
-    AL:38,
-    CAT_B:2, CAT_C:3, CAT_F:6
-  },
+	LAYOUT: {
+		MASTER: { HEADER_ROWS: 2, START_ROW: 3, LAST_COL_INDEX: 38 }, // A..AL
+		CATEGORY: { HEADER_ROWS: 1, START_ROW: 2, LAST_COL_INDEX: 6 }  // A..F
+	},
 
-  GITHUB: {
-    USER:'y4m4usr',
-    REPO:'HL001-quiz-karacon-academia-new',
-    REF :'main',
-    PATHS:{ LENS_DIR:'imagesnew1/lens/lens1', SAMUNE_DIR:'imagesnew1/samune/samune1' }
-  },
+	COLS: {
+		E: 5, I: 9, J: 10, K: 11,
+		P: 16, Q: 17, R: 18,
+		W: 23, X: 24,
+		AL: 38,
+		CAT_B: 2, CAT_C: 3, CAT_F: 6
+	},
 
-  STRICT: {
-    ROW_MUST_BE_FULL    : true,   // 行内空白が1つでもあれば除外（本番仕様）
-    ALLOW_REQUIRED_ONLY : false   // ★ 仕様に合わせて救済OFF（E/I/J/K/X すべて必須）
-  },
+	GITHUB: {
+		USER: 'y4m4usr',
+		REPO: 'HL001-quiz-karacon-academia-new',
+		REF: 'main',
+		PATHS: { LENS_DIR: 'imagesnew1/lens/lens1', SAMUNE_DIR: 'imagesnew1/samune/samune1' }
+	},
 
-  // ★ 移行中の保険：Xが空なら GitHub 命名でレンズ画像を補完（整備後は false に）
-  MIGRATION: { PERMIT_X_FALLBACK_GITHUB: true },
+	STRICT: {
+		// Use required columns only (E/I/J/K/X). Do not require full row fill.
+		ROW_MUST_BE_FULL: false,
+		ALLOW_REQUIRED_ONLY: true
+	},
 
-  DEV: { WRITE_CSV:false }        // Drive依存は完全停止
+	// If X is blank, allow GitHub-named image fallback (set false to disable)
+	MIGRATION: { PERMIT_X_FALLBACK_GITHUB: true },
+
+	DEV: { WRITE_CSV: false }
 };

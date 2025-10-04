@@ -28,6 +28,16 @@ function toCdnFallback_(u){
   return String(u).replace(/^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/i,
     'https://cdn.jsdelivr.net/gh/$1/$2@$3/$4');
 }
+function toDriveDirect_(u){
+  try{
+    const s = String(u||"");
+    let m = s.match(/https?:\/\/drive\.google\.com\/file\/d\/([^/]+)/i);
+    if (m && m[1]) return 'https://drive.google.com/uc?export=view&id=' + m[1];
+    m = s.match(/https?:\/\/drive\.google\.com\/open\?id=([^&]+)/i);
+    if (m && m[1]) return 'https://drive.google.com/uc?export=view&id=' + m[1];
+    return s;
+  }catch(e){ return String(u||""); }
+}
 function urlOkOrCdn_(u){
   if (_isBlank(u)) return "";
   try{
@@ -134,7 +144,16 @@ function pickWrongAnswers_(correct, pool, catMap, n){
 /* ---------- image resolve (X→raw→CDN) ---------- */
 function resolveImage_(rec){
   const u = !_isBlank(rec.X) ? String(rec.X).trim() : "";
-  return urlOkOrCdn_(u);
+  // Try X as-is (raw or CDN fallback); if inaccessible or Drive link, try GitHub-named fallback
+  let res = urlOkOrCdn_(toDriveDirect_(u));
+  if (!res){
+    try{
+      // Fallback by naming convention stored on GitHub
+      const named = buildImageUrlByNaming_(rec, 'lens');
+      res = urlOkOrCdn_(named);
+    }catch(e){}
+  }
+  return res || "";
 }
 
 /* ---------- generator (count件必須) ---------- */
