@@ -1,117 +1,218 @@
-<!DOCTYPE html><html lang="ja">
+<!DOCTYPE html>
+<html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Quiz☆カラコンアカデミア</title>
-
-  <!-- CSP: GAS API / GitHub Raw / jsDelivr を許可 -->
   <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self' https://www.gstatic.com https://apis.google.com;
-    script-src  'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com;
-    connect-src 'self' https://script.google.com https://script.googleusercontent.com https://raw.githubusercontent.com https://cdn.jsdelivr.net;
-    img-src     'self' data: blob: https://raw.githubusercontent.com https://cdn.jsdelivr.net;
-    style-src   'self' 'unsafe-inline';
-    font-src    'self' data:;
-    frame-src   https://script.google.com https://script.googleusercontent.com;
-    frame-ancestors 'self' https://script.google.com https://script.googleusercontent.com;
-    worker-src  'self' blob:;
-  ">
-
+  default-src 'self' https://www.gstatic.com https://apis.google.com;
+  script-src  'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com;
+  connect-src 'self' https://script.google.com https://script.googleusercontent.com https://raw.githubusercontent.com https://cdn.jsdelivr.net https://api.github.com https://fonts.googleapis.com https://fonts.gstatic.com;
+  img-src     'self' data: blob: https://raw.githubusercontent.com https://cdn.jsdelivr.net;
+  style-src   'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src    'self' data: https://fonts.gstatic.com;
+  frame-src   https://script.google.com https://script.googleusercontent.com;
+  frame-ancestors 'self' https://script.google.com https://script.googleusercontent.com;
+  worker-src  'self' blob: https://script.google.com https://script.googleusercontent.com;
+">
+  <!-- Noto Sans JP (variable, 100..900) from Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap" rel="stylesheet">
   <style>
-    html,body,*{
-      font-family:"Noto Sans JP", system-ui, -apple-system, "Segoe UI",
-                  "Hiragino Kaku Gothic ProN","Meiryo", sans-serif;
+    /* Using Google Fonts; no local font files required */
+    :root{ color-scheme:light; }
+    body{
+      margin:0; padding:0; background:#f5f5f9;
+      font-family:"Noto Sans JP",system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;
+      color:#1f2937;
     }
-    body{ margin:0; background:#fafafa; }
-    .wrap{ max-width:960px; margin:32px auto; padding:16px; }
-    .card{ background:#fff; border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,.06); padding:20px; }
-    .meta{ color:#666; font-size:12px; margin-bottom:12px; }
-    .qimg{ width:100%; max-height:520px; object-fit:contain; border-radius:12px; background:#f1f1f1; }
-    .opts{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
-    button.opt{ padding:12px 14px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; }
-    button.opt:hover{ background:#f9fafb; }
-    .loading{ padding:24px; text-align:center; color:#666; }
-    .err{ color:#b00020; white-space:pre-wrap; }
+    .wrap{ max-width:960px; margin:0 auto; padding:24px 16px 80px; }
+    h1{ margin:0 0 16px; font-size:24px; }
+    .control-bar{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    button{ cursor:pointer; border:none; border-radius:999px; padding:12px 20px; font-size:16px; background:#2563eb; color:#fff; transition:background .2s; }
+    button[disabled]{ background:#9ca3af; cursor:not-allowed; }
+    button:hover:not([disabled]){ background:#1d4ed8; }
+    .status{ font-size:14px; color:#4b5563; min-height:20px; }
+    .quiz-card{ margin-top:24px; background:#fff; border-radius:16px; box-shadow:0 12px 40px rgba(15,23,42,0.08); padding:24px; }
+    .qno{ font-size:18px; font-weight:600; margin-bottom:16px; }
+    .qimg{ width:100%; max-height:460px; object-fit:contain; border-radius:12px; background:#f3f4f6; }
+    .opts{ margin-top:20px; display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
+    .opt-btn{ border:1px solid #d1d5db; background:#fff; color:#1f2937; border-radius:12px; padding:12px 16px; font-size:15px; text-align:left; transition:background .2s,border-color .2s; }
+    .opt-btn:hover{ background:#eff6ff; border-color:#2563eb; }
+    .opt-btn.correct{ background:#ecfdf5; border-color:#10b981; }
+    .opt-btn.incorrect{ background:#fef2f2; border-color:#ef4444; }
+    .grid{ display:grid; gap:32px; margin-top:32px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); }
+    .panel{ background:#fff; border-radius:16px; box-shadow:0 10px 30px rgba(15,23,42,0.06); padding:20px; }
+    .panel h2{ margin:0 0 12px; font-size:18px; }
+    ul.rank{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; font-size:14px; }
+    ul.rank li{ padding:8px 10px; border-radius:12px; background:#f9fafb; }
+    .mystats{ font-size:14px; line-height:1.6; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card">
-      <div class="meta" id="meta">問題を取得中…</div>
-      <img id="qimg" class="qimg" alt="レンズ画像" />
+    <h1>Quiz☆カラコンアカデミア</h1>
+    <div class="control-bar">
+      <button id="startBtn" type="button">出題を開始</button>
+      <div class="status" id="status"></div>
+    </div>
+    <div class="quiz-card">
+      <div class="qno" id="qno">10問チャレンジの準備ができたら「出題を開始」を押してください。</div>
+      <img id="qimg" class="qimg" alt="レンズ画像">
       <div class="opts" id="opts"></div>
-      <div id="msg" class="err" style="margin-top:12px;"></div>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <h2>ランキング（直近7日）</h2>
+        <ul id="rank" class="rank"></ul>
+      </div>
+      <div class="panel">
+        <h2>マイ成績</h2>
+        <div class="mystats" id="mystats">読み込み中…</div>
+      </div>
     </div>
   </div>
 
   <script>
-  // Raw → jsDelivr フォールバック
-  function toCdnFallback(rawUrl){
-    try{
-      return rawUrl.replace(
-        /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/i,
-        'https://cdn.jsdelivr.net/gh/$1/$2@$3/$4'
-      );
-    }catch(_){ return rawUrl; }
-  }
-  function setQuestionImage(url){
-    const img = document.getElementById('qimg');
-    if (!img) return;
-    let tried = false;
-    img.onerror = function(){
-      if (tried) return;
-      tried = true;
-      this.src = toCdnFallback(this.currentSrc || url);
-    };
-    img.src = url;
-  }
+    (function(){
+      var items=[], idx=0, results=[];
+      var isTest = /[?&]test=1\b/i.test(location.search);
+      var uid = localStorage.getItem(isTest ? 'quiz_uid_test' : 'quiz_uid');
+      if (!uid){
+        uid = (isTest ? 'test-' : 'guest-') + Math.floor(Math.random()*1000000);
+        localStorage.setItem(isTest ? 'quiz_uid_test' : 'quiz_uid', uid);
+      }
+      var sessionId = (isTest ? 'test-' : 's') + Date.now();
 
-  (function(){
-    const meta = document.getElementById('meta');
-    const img  = document.getElementById('qimg');
-    const opts = document.getElementById('opts');
-    const msg  = document.getElementById('msg');
+      function setStatus(text){
+        document.getElementById('status').textContent = text || '';
+      }
 
-    const BASE = location.origin + location.pathname; // 同一WebApp
-    const ITEMS_URL = BASE + '?action=items';
+      function toCdnFallback(url){
+        if (!url) return '';
+        return String(url).replace(/^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/,
+          'https://cdn.jsdelivr.net/gh/$1/$2@$3/$4');
+      }
 
-    function load(){
-      meta.textContent = '問題を取得中…';
-      msg.textContent = '';
-      opts.innerHTML = '';
-      img.removeAttribute('src');
+      function showQuestion(){
+        if (!items[idx]){ finish(); return; }
+        var q = items[idx];
+        document.getElementById('qno').textContent = String(idx + 1) + ' / ' + String(items.length);
+        var img = document.getElementById('qimg');
+        var fallbackUsed = false;
+        img.onerror = function(){
+          if (fallbackUsed) return;
+          fallbackUsed = true;
+          img.src = toCdnFallback(img.currentSrc || q.image);
+        };
+        img.src = q.image;
+        var opts = document.getElementById('opts');
+        opts.innerHTML = '';
+        q.options.forEach(function(option, i){
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'opt-btn';
+          btn.textContent = option.label;
+          btn.addEventListener('click', function(){ answer(i); });
+          opts.appendChild(btn);
+        });
+        setStatus('画像を確認して正しい組み合わせを選んでください。');
+      }
 
-      fetch(ITEMS_URL, { method:'GET', mode:'cors', credentials:'omit' })
-        .then(r => r.ok ? r.json() : Promise.reject(new Error('items fetch '+r.status)))
-        .then(data => {
-          if (!data || !data.items || !data.items.length) throw new Error('問題データが空です');
-          const q = data.items[0];
-          meta.textContent = `CK: ${q.correct.E} | ${q.correct.I} | ${q.correct.J} | ${q.correct.K}`;
+      function disableOptionButtons(){
+        var buttons = document.querySelectorAll('.opt-btn');
+        for (var i=0; i<buttons.length; i++) buttons[i].disabled = true;
+      }
 
-          // 画像（raw→CDNフォールバック）
-          setQuestionImage(q.image);
+      function answer(index){
+        var q = items[idx];
+        if (!q) return;
+        var option = q.options[index];
+        disableOptionButtons();
+        var buttons = document.querySelectorAll('.opt-btn');
+        for (var i=0; i<buttons.length; i++){
+          var op = q.options[i];
+          if (op.isCorrect){ buttons[i].classList.add('correct'); }
+          if (!op.isCorrect && i===index){ buttons[i].classList.add('incorrect'); }
+        }
+        results.push({ qid:q.qid, correct: option.isCorrect ? true : false, ms:0 });
+        idx += 1;
+        setTimeout(function(){
+          if (idx >= items.length){ finish(); }
+          else { showQuestion(); }
+        }, 600);
+      }
 
-          // 選択肢
-          q.options.forEach(o => {
-            const b = document.createElement('button');
-            b.className = 'opt';
-            b.textContent = o.label;
-            b.onclick = () => {
-              if (o.isCorrect) {
-                b.style.background = '#ecfdf5'; b.style.borderColor = '#10b981';
-                meta.textContent = '✅ 正解！';
-              } else {
-                b.style.background = '#fef2f2'; b.style.borderColor = '#ef4444';
-                meta.textContent = '❌ 不正解…';
-              }
-            };
-            opts.appendChild(b);
+      function finish(){
+        setStatus('回答を送信しています…');
+        document.getElementById('qno').textContent = '終了しました';
+        document.getElementById('opts').innerHTML = '';
+        var payload = { uid:uid, session:sessionId, results:results, test:isTest };
+        google.script.run.withSuccessHandler(function(res){
+          if (!res || !res.ok){ setStatus('送信エラーが発生しました。'); return; }
+          setStatus('回答を記録しました。引き続き復習してください。');
+          loadRank();
+          loadMy();
+        }).withFailureHandler(function(){ setStatus('送信に失敗しました。時間をおいて再試行してください。'); })
+          .submit_(payload);
+      }
+
+      function startQuiz(){
+        var btn = document.getElementById('startBtn');
+        btn.disabled = true;
+        setStatus('問題を取得中…');
+        idx = 0; results = [];
+        google.script.run.withSuccessHandler(function(res){
+          if (!res || !res.ok){ setStatus('問題取得に失敗しました。'); btn.disabled = false; return; }
+          items = Array.isArray(res.items) ? res.items.slice(0) : [];
+          if (items.length < 1){ setStatus('問題データが取得できませんでした。'); btn.disabled = false; return; }
+          sessionId = (isTest ? 'test-' : 's') + Date.now();
+          showQuestion();
+          btn.disabled = false;
+        }).withFailureHandler(function(){
+          setStatus('通信に失敗しました。');
+          btn.disabled = false;
+        }).itemsSrv_(10);
+      }
+
+      function loadRank(){
+        google.script.run.withSuccessHandler(function(data){
+          var list = document.getElementById('rank');
+          list.innerHTML = '';
+          var rows = data && data.rank ? data.rank : [];
+          if (!rows.length){
+            var empty = document.createElement('li');
+            empty.textContent = 'ランキングデータがありません。';
+            list.appendChild(empty);
+            return;
+          }
+          rows.forEach(function(row, i){
+            var li = document.createElement('li');
+            li.textContent = String(i+1) + '. ' + row.uid + ' / ' + row.score + 'pt (' + row.correct + '/' + row.total + ')';
+            list.appendChild(li);
           });
-        })
-        .catch(e => { msg.textContent = '読み込みエラー: ' + e.message; });
-    }
-    document.addEventListener('DOMContentLoaded', load);
-  })();
+        }).withFailureHandler(function(){
+          var list = document.getElementById('rank');
+          list.innerHTML = '<li>ランキングの取得に失敗しました。</li>';
+        }).rankSrv_(isTest);
+      }
+
+      function loadMy(){
+        google.script.run.withSuccessHandler(function(data){
+          var box = document.getElementById('mystats');
+          var stats = data && data.stats ? data.stats : { correct:0, total:0 };
+          box.textContent = uid + ' さん: ' + stats.correct + ' / ' + stats.total + ' 正解';
+        }).withFailureHandler(function(){
+          document.getElementById('mystats').textContent = 'マイ成績の取得に失敗しました。';
+        }).mystatsSrv_(uid, isTest);
+      }
+
+      document.getElementById('startBtn').addEventListener('click', startQuiz);
+      loadRank();
+      loadMy();
+      setStatus('ユーザーID: ' + uid + ' さん');
+    })();
   </script>
 </body>
 </html>
