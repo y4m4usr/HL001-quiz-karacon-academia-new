@@ -1,4 +1,3 @@
-
 {
   "timeZone": "Asia/Tokyo",
   "dependencies": {},
@@ -15,6 +14,11 @@
     "access": "ANYONE_ANONYMOUS"
   },
   "urlFetchWhitelist": [
-    "https://raw.githubusercontent.com/"
+    "https://raw.githubusercontent.com/",
+    "https://cdn.jsdelivr.net/",
+    "https://drive.google.com/",
+    "https://docs.google.com/",
+    "https://lh3.googleusercontent.com/",
+    "https://drive.usercontent.google.com/"
   ]
 }
