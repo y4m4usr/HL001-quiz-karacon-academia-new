@@ -37,7 +37,7 @@ const CFG = {
 	},
 
 	// If X is blank, allow GitHub-named image fallback (set false to disable)
-	MIGRATION: { PERMIT_X_FALLBACK_GITHUB: true },
+	MIGRATION: { PERMIT_X_FALLBACK_GITHUB: true, PREFER_GITHUB: true },
 
 	DEV: { WRITE_CSV: false }
 };

@@ -1,6 +1,12 @@
 {
   "devDependencies": {
     "@types/chrome": "^0.1.12"
+  },
+  "dependencies": {
+    "sharp": "^0.33.3"
+  },
+  "scripts": {
+    "maint:images": "node scripts/maint_images.cjs"
   }
 }
   
