@@ -110,7 +110,7 @@ function readMasterStrict_(){
     const rec = {
       E:r[C.E-1], I:r[C.I-1], J:r[C.J-1], K:r[C.K-1],
       P:r[C.P-1], Q:r[C.Q-1], R:r[C.R-1],
-      W:r[C.W-1], X:r[C.X-1], AJ:r[C.AJ-1], AL:r[C.AL-1]
+      W:r[C.W-1], X:r[C.X-1], AJ:r[C.AJ-1], AK:r[C.AK-1]
     };
     if (!_validRec(rec)) continue; // v2.0: E/I/J/AJ が必須、'-'除外
     out.push(rec);
@@ -129,19 +129,20 @@ function pickWrongAnswers_(correct, pool, n){
     .map(function(s){return s.trim();})
     .filter(Boolean);
   const picked=[];
-  const seen = new Set();
+  const seenEIJ = new Set();
 
   function baseFilter(r){
-    if (!r || _ck(r)===corr) return false;
+    if (!r) return false;
+    if (_eij(r) === _eij(correct)) return false; // v2.1.1: E|I|J が同じは不可
     return true;
   }
   function pushUnique(list){
     for (const r of list){
       if (picked.length>=n) break;
-      const ck = _ck(r);
-      if (seen.has(ck)) continue;
+      const eij = _eij(r);
+      if (seenEIJ.has(eij)) continue;
       picked.push(r);
-      seen.add(ck);
+      seenEIJ.add(eij);
     }
   }
 
@@ -208,7 +209,7 @@ function generateQuestions_(count){
       image: imgs.lens,
       thumb: imgs.samune,
       specs:{DIA:r.P, G_DIA:r.Q, BC:r.R},
-      comment: String(r.AL||""),
+      comment: String(r.AK||""),
       correct:{E:r.E,I:r.I,J:r.J,K:r.K},
       options: options
     });

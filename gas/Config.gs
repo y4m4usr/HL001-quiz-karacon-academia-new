@@ -6,7 +6,7 @@ const CFG = {
 	},
 
 	SHEETS: {
-		MASTER: 'master',
+		MASTER: '20251005_HL001使用_109販促データCP',
 		CATEGORY: 'カラーカテゴリ'
 	},
 
@@ -19,7 +19,7 @@ const CFG = {
 		E: 5, I: 9, J: 10, K: 11,
 		P: 16, Q: 17, R: 18,
 		W: 23, X: 24,
-		AJ: 36, AL: 38,
+		AJ: 36, AK: 37,
 		CAT_B: 2, CAT_C: 3, CAT_F: 6
 	},
 
