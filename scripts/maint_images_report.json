@@ -1,0 +1,161 @@
+{
+  "summary": {
+    "scanned": 1787,
+    "invalidLocal": 0,
+    "invalidRemote": 25,
+    "optimized": 1787,
+    "bytesSaved": 32166
+  },
+  "issues": [
+    {
+      "file": "imagesnew1/lens/lens1/AEL0001_アイエクリプス_グレムーン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AEL0001_アイエクリプス_ブルムーン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AEL0001_アイエクリプス_ライトムーン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AEL0002_アイエクリプス_サターン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AEL0002_アイエクリプス_ブラムーン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AEL0003_アイエクリプス_グレムーン_1month_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0003_バンビシリーズ_アーモンド_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0003_バンビシリーズ_カシスブラウン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0003_バンビシリーズ_クリームピンク_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0003_バンビシリーズ_ショコラ_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0003_バンビシリーズ_スワングレー_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0003_バンビシリーズ_スワンブルー_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0003_バンビシリーズ_パールグレー_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0003_バンビシリーズ_ミルクベージュ_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0003_バンビシリーズ_レモンヘーゼル_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0005_バンビシリーズ_アーモンド_1month_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0005_バンビシリーズ_スワングレー_1month_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0005_バンビシリーズ_スワンブルー_1month_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0007_バンビシリーズ_セサミムーン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0007_バンビシリーズ_ハニームーン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0007_バンビシリーズ_ブルーベリームーン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0021_バンビシリーズ ヴィンテージ_ナチュラルヌード_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0021_バンビシリーズ ヴィンテージ_ナチュラルブラウン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0021_バンビシリーズ ヴィンテージ_ピュアブラウン_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    },
+    {
+      "file": "imagesnew1/lens/lens1/AG0021_バンビシリーズ ヴィンテージ_ヴィンテージクラシック_1day_lens.jpg",
+      "type": "remote-invalid",
+      "status": 0,
+      "ct": ""
+    }
+  ]
+}

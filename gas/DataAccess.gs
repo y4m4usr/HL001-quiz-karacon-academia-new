@@ -28,6 +28,48 @@ function toCdnFallback_(u){
   return String(u).replace(/^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/i,
     'https://cdn.jsdelivr.net/gh/$1/$2@$3/$4');
 }
+
+// ---- image validation helpers (avoid HTML saved as .jpg) ----
+function _headersContentType_(resp){
+  try{
+    var h = resp && typeof resp.getHeaders === 'function' ? resp.getHeaders() : {};
+    if (!h) return '';
+    for (var k in h){
+      if (!Object.prototype.hasOwnProperty.call(h,k)) continue;
+      if (String(k).toLowerCase() === 'content-type') return String(h[k]||'');
+    }
+  }catch(e){}
+  return '';
+}
+function _looksLikeImageBytes_(bytes){
+  try{
+    if (!bytes || bytes.length < 4) return false;
+    var b0=bytes[0]|0, b1=bytes[1]|0, b2=bytes[2]|0, b3=bytes[3]|0;
+    // JPEG
+    if (b0===0xFF && b1===0xD8 && b2===0xFF) return true;
+    // PNG
+    if (b0===0x89 && b1===0x50 && b2===0x4E && b3===0x47) return true;
+    // GIF
+    if (b0===0x47 && b1===0x49 && b2===0x46 && b3===0x38) return true;
+    // WEBP: RIFF....WEBP
+    if (bytes.length>=12 && b0===0x52 && b1===0x49 && b2===0x46 && b3===0x46 &&
+        (bytes[8]|0)===0x57 && (bytes[9]|0)===0x45 && (bytes[10]|0)===0x42 && (bytes[11]|0)===0x50) return true;
+  }catch(e){}
+  return false;
+}
+function _fetchIsImage_(u){
+  try{
+    var res = UrlFetchApp.fetch(u, { muteHttpExceptions:true, followRedirects:true });
+    var code = res.getResponseCode();
+    if (code>=200 && code<400){
+      var ct = _headersContentType_(res);
+      if (/^image\//i.test(ct)) return true;
+      var bytes = res.getContent();
+      return _looksLikeImageBytes_(bytes);
+    }
+  }catch(e){}
+  return false;
+}
 function toDriveDirect_(u){
   try{
     const s = String(u||"");
@@ -40,15 +82,11 @@ function toDriveDirect_(u){
 }
 function urlOkOrCdn_(u){
   if (_isBlank(u)) return "";
-  try{
-    const r = UrlFetchApp.fetch(u, {muteHttpExceptions:true, followRedirects:true});
-    if (r.getResponseCode()>=200 && r.getResponseCode()<400) return u;
-  }catch(e){}
-  const cdn = toCdnFallback_(u);
-  try{
-    const r2 = UrlFetchApp.fetch(cdn, {muteHttpExceptions:true, followRedirects:true});
-    if (r2.getResponseCode()>=200 && r2.getResponseCode()<400) return cdn;
-  }catch(e){}
+  try{ if (_fetchIsImage_(u)) return u; }catch(e){}
+  var cdn = toCdnFallback_(u);
+  if (cdn && cdn!==u){
+    try{ if (_fetchIsImage_(cdn)) return cdn; }catch(e){}
+  }
   return "";
 }
 
@@ -144,15 +182,29 @@ function pickWrongAnswers_(correct, pool, catMap, n){
 /* ---------- image resolve (X→raw→CDN) ---------- */
 function resolveImage_(rec){
   const u = !_isBlank(rec.X) ? String(rec.X).trim() : "";
-  // Try X as-is (raw or CDN fallback); if inaccessible or Drive link, try GitHub-named fallback
-  let res = urlOkOrCdn_(toDriveDirect_(u));
-  if (!res){
+  const tryGithub = function(){
     try{
-      // Fallback by naming convention stored on GitHub
-      const named = buildImageUrlByNaming_(rec, 'lens');
-      res = urlOkOrCdn_(named);
-    }catch(e){}
+      const lens = buildImageUrlByNaming_(rec, 'lens');
+      let res = urlOkOrCdn_(lens);
+      if (!res){
+        const samune = buildImageUrlByNaming_(rec, 'samune');
+        res = urlOkOrCdn_(samune);
+      }
+      return res || "";
+    }catch(e){ return ""; }
+  };
+
+  // Prefer GitHub-hosted images when configured
+  if (CFG?.MIGRATION?.PREFER_GITHUB){
+    const g = tryGithub();
+    if (g) return g;
   }
+
+  let res = urlOkOrCdn_(toDriveDirect_(u));
+  if (res) return res;
+
+  // Fallback to GitHub naming if X was empty or unreachable
+  res = tryGithub();
   return res || "";
 }
 
