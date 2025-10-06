@@ -1,4 +1,4 @@
-/** v1.2 最終：X列＝画像の正。必要時のみ命名フォールバック。10問必須。 */
+/** v2.0: GitHub命名画像優先、E|I|J重複除外、AJカテゴリで誤答抽出、ヒント対応。 */
 
 const _isBlank = v => v === null || v === undefined || String(v).trim() === "";
 
@@ -16,7 +16,15 @@ function _values_(sh, startRow, lastColIndex){
   return sh.getRange(startRow,1, lr-(startRow-1), lc).getValues();
 }
 function _ck(r){ const a=r?.E||"", b=r?.I||"", c=r?.J||"", d=r?.K||""; return [a,b,c,d].map(s=>String(s).trim()).join('|'); }
-function _validRec(r){ return r && !['E','I','J','K','X'].some(k => _isBlank(r[k])); }
+function _eij(r){ const a=r?.E||"", b=r?.I||"", c=r?.J||""; return [a,b,c].map(s=>String(s).trim()).join('|'); }
+function _isDash(v){ return String(v||"").trim()==='-'; }
+function _validRec(r){
+  if (!r) return false;
+  // 必須: E/I/J, かつ AJ(カテゴリ) が '-' でない
+  if ([r.E, r.I, r.J].some(x => _isBlank(x) || _isDash(x))) return false;
+  if (_isBlank(r.AJ) || _isDash(r.AJ)) return false;
+  return true;
+}
 
 function buildImageUrlByNaming_(rec, kind/*lens|samune*/){
   const dir = (kind==='samune') ? CFG.GITHUB.PATHS.SAMUNE_DIR : CFG.GITHUB.PATHS.LENS_DIR;
@@ -99,51 +107,32 @@ function readMasterStrict_(){
   for (let r of vs){
     if (!Array.isArray(r)) continue;
     if (r.length < need) r = r.concat(Array(need-r.length).fill(""));
-    if (CFG.STRICT.ROW_MUST_BE_FULL && r.some(_isBlank)) continue;
-    const rec = { E:r[C.E-1], I:r[C.I-1], J:r[C.J-1], K:r[C.K-1], P:r[C.P-1], Q:r[C.Q-1], R:r[C.R-1], W:r[C.W-1], X:r[C.X-1] };
-
-    if (_isBlank(rec.X)) {
-      if (CFG.MIGRATION.PERMIT_X_FALLBACK_GITHUB && !['E','I','J','K'].some(k=>_isBlank(rec[k]))){
-        rec.X = buildImageUrlByNaming_(rec,'lens');
-      } else {
-        continue;
-      }
-    }
-    if (!_validRec(rec)) continue;
+    const rec = {
+      E:r[C.E-1], I:r[C.I-1], J:r[C.J-1], K:r[C.K-1],
+      P:r[C.P-1], Q:r[C.Q-1], R:r[C.R-1],
+      W:r[C.W-1], X:r[C.X-1], AJ:r[C.AJ-1], AL:r[C.AL-1]
+    };
+    if (!_validRec(rec)) continue; // v2.0: E/I/J/AJ が必須、'-'除外
     out.push(rec);
   }
   return out;
 }
 
 /* ---------- categories ---------- */
-function readCategories_(){
-  const sh = _open_(CFG.SHEET_IDS.CATEGORY, CFG.SHEETS.CATEGORY);
-  const vs = _values_(sh, CFG.LAYOUT.CATEGORY.START_ROW, CFG.LAYOUT.CATEGORY.LAST_COL_INDEX);
-  const B=CFG.COLS.CAT_B-1, C=CFG.COLS.CAT_C-1, F=CFG.COLS.CAT_F-1;
-  const map=new Map();
-  for (const r of vs){
-    if (!Array.isArray(r)) continue;
-    if (r.some(_isBlank)) continue;
-    const brand = String(r[B]||"").trim();
-    const color = String(r[C]||"").trim();
-    const cats  = String(r[F]||"").split(/[\,\u3001\uFF0C\u30FB\/／|]+/).map(s=>s.trim()).filter(Boolean);
-    if (!brand || !color || !cats.length) continue;
-    map.set(brand + '|' + color, cats);
-  }
-  return map;
-}
+// v2.0: カテゴリは master の AJ 列を用いる
 
 /* ---------- wrong answers (X必須) ---------- */
-function pickWrongAnswers_(correct, pool, catMap, n){
+function pickWrongAnswers_(correct, pool, n){
   const corr = _ck(correct);
-  const key = String(correct.I) + '|' + String(correct.J);
-  const words = catMap.get(key)||[];
+  const correctCats = String(correct.AJ||"")
+    .split(/[\,\u3001\uFF0C\u30FB\/／|]+/)
+    .map(function(s){return s.trim();})
+    .filter(Boolean);
   const picked=[];
   const seen = new Set();
 
   function baseFilter(r){
     if (!r || _ck(r)===corr) return false;
-    if (_isBlank(r.X)) return false;
     return true;
   }
   function pushUnique(list){
@@ -156,23 +145,26 @@ function pickWrongAnswers_(correct, pool, catMap, n){
     }
   }
 
-  const catMatch = pool.filter(r=>{
+  const catMatch = pool.filter(function(r){
     if (!baseFilter(r)) return false;
-    const c = catMap.get(String(r.I) + '|' + String(r.J))||[];
-    return c.length && words.some(w=>c.includes(w));
-  }).sort(()=>Math.random()-0.5);
+    const cats = String(r.AJ||"")
+      .split(/[\,\u3001\uFF0C\u30FB\/／|]+/)
+      .map(function(s){return s.trim();})
+      .filter(Boolean);
+    return cats.length && correctCats.some(function(w){return cats.indexOf(w)>=0;});
+  }).sort(function(){return Math.random()-0.5;});
   pushUnique(catMatch);
 
   if (picked.length<n){
-    const colorMatch = pool.filter(r=>{
+    const colorMatch = pool.filter(function(r){
       if (!baseFilter(r)) return false;
       return (String(r.I) === String(correct.I)) || (String(r.J) === String(correct.J));
-    }).sort(()=>Math.random()-0.5);
+    }).sort(function(){return Math.random()-0.5;});
     pushUnique(colorMatch);
   }
 
   if (picked.length<n){
-    const any = pool.filter(r=>baseFilter(r)).sort(()=>Math.random()-0.5);
+    const any = pool.filter(function(r){return baseFilter(r);}).sort(function(){return Math.random()-0.5;});
     pushUnique(any);
   }
 
@@ -180,51 +172,47 @@ function pickWrongAnswers_(correct, pool, catMap, n){
 }
 
 /* ---------- image resolve (X→raw→CDN) ---------- */
-function resolveImage_(rec){
-  const u = !_isBlank(rec.X) ? String(rec.X).trim() : "";
-  const tryGithub = function(){
-    try{
-      const lens = buildImageUrlByNaming_(rec, 'lens');
-      let res = urlOkOrCdn_(lens);
-      if (!res){
-        const samune = buildImageUrlByNaming_(rec, 'samune');
-        res = urlOkOrCdn_(samune);
-      }
-      return res || "";
-    }catch(e){ return ""; }
-  };
-
-  // Prefer GitHub-hosted images when configured
-  if (CFG?.MIGRATION?.PREFER_GITHUB){
-    const g = tryGithub();
-    if (g) return g;
-  }
-
-  let res = urlOkOrCdn_(toDriveDirect_(u));
-  if (res) return res;
-
-  // Fallback to GitHub naming if X was empty or unreachable
-  res = tryGithub();
-  return res || "";
+function resolveImages_(rec){
+  // v2.0: GitHub命名優先。lens と samune の両方を解決し返す。
+  var lens = urlOkOrCdn_(buildImageUrlByNaming_(rec,'lens'));
+  var sam  = urlOkOrCdn_(buildImageUrlByNaming_(rec,'samune'));
+  // 旧X列があれば最終フォールバックとして使用
+  if (!lens && !_isBlank(rec.X)) lens = urlOkOrCdn_(toDriveDirect_(String(rec.X)));
+  if (!sam) sam = lens; // サムネ未取得時はレンズで代替
+  return { lens: lens||"", samune: sam||"" };
 }
 
 /* ---------- generator (count件必須) ---------- */
 function generateQuestions_(count){
   const pool = readMasterStrict_();
-  const cats = readCategories_();
+  if (!pool.length) throw new Error('データがありません（有効行なし）');
   const qs=[];
-  for (const r of pool.sort(()=>Math.random()-0.5)){
+  const seenEIJ = new Set();
+  const shuffled = pool.slice().sort(function(){ return Math.random()-0.5; });
+  for (var i=0; i<shuffled.length; i++){
     if (qs.length>=count) break;
-    const img = resolveImage_(r);
-    if (_isBlank(img)) continue;
-    const ws = pickWrongAnswers_(r, pool, cats, 3);
+    var r = shuffled[i];
+    var eij = _eij(r);
+    if (seenEIJ.has(eij)) continue; // v2.0: E|I|J 重複除外
+    var imgs = resolveImages_(r);
+    if (_isBlank(imgs.lens)) continue; // 表示画像がなければスキップ
+    var ws = pickWrongAnswers_(r, pool, 3);
     if (ws.length<3) continue;
 
-    const options = [{label:String(r.I) + ' / ' + String(r.J), isCorrect:true}].concat(
-                     ws.map(function(w){ return {label:String(w.I) + ' / ' + String(w.J), isCorrect:false}; })
-                   ).sort(function(){ return Math.random()-0.5; });
+    var options = [{label:String(r.I) + ' / ' + String(r.J), isCorrect:true}].concat(
+                   ws.map(function(w){ return {label:String(w.I) + ' / ' + String(w.J), isCorrect:false}; })
+                 ).sort(function(){ return Math.random()-0.5; });
 
-    qs.push({ qid:'CK:' + _ck(r), image:img, specs:{DIA:r.P, G_DIA:r.Q, BC:r.R}, correct:{E:r.E,I:r.I,J:r.J,K:r.K}, options: options });
+    qs.push({
+      qid:'CK:' + _ck(r),
+      image: imgs.lens,
+      thumb: imgs.samune,
+      specs:{DIA:r.P, G_DIA:r.Q, BC:r.R},
+      comment: String(r.AL||""),
+      correct:{E:r.E,I:r.I,J:r.J,K:r.K},
+      options: options
+    });
+    seenEIJ.add(eij);
   }
   if (qs.length < count) throw new Error('クイズを作成するのに十分なデータがありません（最低' + count + '件必要）');
   return qs;
