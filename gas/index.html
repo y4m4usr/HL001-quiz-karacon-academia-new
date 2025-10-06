@@ -37,6 +37,13 @@
     .quiz-card{ margin-top:24px; background:#fff; border-radius:16px; box-shadow:0 12px 40px rgba(15,23,42,0.08); padding:24px; }
     .qno{ font-size:18px; font-weight:600; margin-bottom:16px; }
     .qimg{ width:100%; max-height:460px; object-fit:contain; border-radius:12px; background:#f3f4f6; }
+    .lens-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .lens-img{ width:100%; height:auto; max-height:360px; object-fit:contain; border-radius:12px; background:#f3f4f6; }
+    .hintbar{ display:flex; align-items:center; gap:8px; margin-top:8px; }
+    .hintbox{ margin-top:10px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px; padding:12px; font-size:14px; color:#374151; display:none; }
+    .hintbox.show{ display:block; }
+    .hint1{ margin-bottom:8px; color:#111827; }
+    .thumb{ width:100%; border-radius:12px; display:none; margin-top:12px; }
     .opts{ margin-top:20px; display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
     .opt-btn{ border:1px solid #d1d5db; background:#fff; color:#1f2937; border-radius:12px; padding:12px 16px; font-size:15px; text-align:left; transition:background .2s,border-color .2s; }
     .opt-btn:hover{ background:#eff6ff; border-color:#2563eb; }
@@ -59,7 +66,18 @@
     </div>
     <div class="quiz-card">
       <div class="qno" id="qno">10問チャレンジの準備ができたら「出題を開始」を押してください。</div>
-      <img id="qimg" class="qimg" alt="レンズ画像">
+      <div class="lens-row">
+        <img id="leftLens"  class="lens-img"  decoding="async" loading="lazy" alt="左レンズ">
+        <img id="rightLens" class="lens-img" decoding="async" loading="lazy" alt="右レンズ">
+      </div>
+      <div class="hintbar">
+        <button id="hintBtn" type="button">ヒント</button>
+      </div>
+      <div id="hintBox" class="hintbox">
+        <div id="hint1" class="hint1"></div>
+        <div id="hint2"></div>
+      </div>
+      <img id="feedbackThumb" class="thumb" alt="サムネイル">
       <div class="opts" id="opts"></div>
     </div>
     <div class="grid">
@@ -76,7 +94,7 @@
 
   <script>
     (function(){
-      var items=[], idx=0, results=[];
+      var items=[], idx=0, results=[]; var hintsShown=false;
       var isTest = /[?&]test=1\b/i.test(location.search);
       var uid = localStorage.getItem(isTest ? 'quiz_uid_test' : 'quiz_uid');
       if (!uid){
@@ -95,18 +113,24 @@
           'https://cdn.jsdelivr.net/gh/$1/$2@$3/$4');
       }
 
+      function setImg(el, url){
+        var used=false; el.onerror=function(){ if (used) return; used=true; el.src = toCdnFallback(url); };
+        el.src = url;
+      }
+
       function showQuestion(){
         if (!items[idx]){ finish(); return; }
         var q = items[idx];
         document.getElementById('qno').textContent = String(idx + 1) + ' / ' + String(items.length);
-        var img = document.getElementById('qimg');
-        var fallbackUsed = false;
-        img.onerror = function(){
-          if (fallbackUsed) return;
-          fallbackUsed = true;
-          img.src = toCdnFallback(img.currentSrc || q.image);
-        };
-        img.src = q.image;
+        setImg(document.getElementById('leftLens'), q.image);
+        setImg(document.getElementById('rightLens'), q.image);
+        // reset hints and thumbnail
+        hintsShown = false;
+        document.getElementById('hint1').textContent = q.specs ? ('DIA: ' + (q.specs.DIA||'-') + ' / G.DIA: ' + (q.specs.G_DIA||'-') + ' / BC: ' + (q.specs.BC||'-')) : '';
+        document.getElementById('hint2').textContent = q.comment ? String(q.comment) : '';
+        document.getElementById('hintBox').classList.remove('show');
+        var th = document.getElementById('feedbackThumb');
+        th.style.display = 'none'; th.removeAttribute('src');
         var opts = document.getElementById('opts');
         opts.innerHTML = '';
         q.options.forEach(function(option, i){
@@ -135,6 +159,13 @@
           var op = q.options[i];
           if (op.isCorrect){ buttons[i].classList.add('correct'); }
           if (!op.isCorrect && i===index){ buttons[i].classList.add('incorrect'); }
+        }
+        if (option && option.isCorrect && q.thumb){
+          // show thumbnail as feedback
+          var th = document.getElementById('feedbackThumb');
+          var used=false;
+          th.onerror=function(){ if (used) return; used=true; th.src = toCdnFallback(q.thumb); };
+          th.src = q.thumb; th.style.display = 'block';
         }
         results.push({ qid:q.qid, correct: option.isCorrect ? true : false, ms:0 });
         idx += 1;
@@ -209,6 +240,10 @@
       }
 
       document.getElementById('startBtn').addEventListener('click', startQuiz);
+      document.getElementById('hintBtn').addEventListener('click', function(){
+        var box = document.getElementById('hintBox');
+        hintsShown = !hintsShown; if (hintsShown) box.classList.add('show'); else box.classList.remove('show');
+      });
       loadRank();
       loadMy();
       setStatus('ユーザーID: ' + uid + ' さん');

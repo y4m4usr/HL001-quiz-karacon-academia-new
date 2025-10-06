@@ -1,12 +1,12 @@
 const CFG = {
 	SHEET_IDS: {
-		// Production spreadsheet that contains both sheets: master and カラーカテゴリ
-		MASTER: '1VNpWeHTgSlNOnka4kdMd9TG1eCB3O5CTkBvg8co8uSM',
-		CATEGORY: '1VNpWeHTgSlNOnka4kdMd9TG1eCB3O5CTkBvg8co8uSM'
+		// v2.0 spec: 109販促データ（本番）
+		MASTER: '1Uf2e0eXwcsQGjFtTtEeAWuYh74lh4fFE4NdjmyKHrj0',
+		CATEGORY: '1Uf2e0eXwcsQGjFtTtEeAWuYh74lh4fFE4NdjmyKHrj0'
 	},
 
 	SHEETS: {
-		MASTER: 'master',
+		MASTER: '20251005_HL001使用_109販促データCP',
 		CATEGORY: 'カラーカテゴリ'
 	},
 
@@ -19,7 +19,7 @@ const CFG = {
 		E: 5, I: 9, J: 10, K: 11,
 		P: 16, Q: 17, R: 18,
 		W: 23, X: 24,
-		AL: 38,
+		AJ: 36, AK: 37,
 		CAT_B: 2, CAT_C: 3, CAT_F: 6
 	},
 
@@ -36,7 +36,7 @@ const CFG = {
 		ALLOW_REQUIRED_ONLY: true
 	},
 
-	// If X is blank, allow GitHub-named image fallback (set false to disable)
+	// Prefer GitHub-named images per v2.0 spec (lens/samune)
 	MIGRATION: { PERMIT_X_FALLBACK_GITHUB: true, PREFER_GITHUB: true },
 
 	DEV: { WRITE_CSV: false }

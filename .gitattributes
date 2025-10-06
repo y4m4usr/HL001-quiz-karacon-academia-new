@@ -1,0 +1,36 @@
+# Line endings policy
+#
+# - Normalize sources to LF in repo AND working tree for cross‑platform dev
+# - Keep Windows shell scripts (PowerShell/cmd) as CRLF
+# - Mark common binaries explicitly to avoid any EOL changes
+
+* text=auto
+
+# Source files (LF)
+*.gs   text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+*.ts   text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.txt  text eol=lf
+
+# Windows scripts (CRLF)
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Binary assets
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.woff binary
+*.woff2 binary
